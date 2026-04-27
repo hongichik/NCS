@@ -12,9 +12,14 @@ from utils import build_graph, Data, split_validation
 import pickle
 import argparse
 import datetime
+import os
+import sys
+import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='sample', help='dataset name: diginetica/yoochoose1_4/yoochoose1_64/sample')
+parser.add_argument('--data_path', default='', help='path to dataset folder that contains train.txt and test.txt')
+parser.add_argument('--log_dir', default='../log', help='directory to store run logs')
 parser.add_argument('--method', type=str, default='ggnn', help='ggnn/gat/gcn')
 parser.add_argument('--validation', action='store_true', help='validation')
 parser.add_argument('--epoch', type=int, default=30, help='number of epochs to train for')
@@ -27,8 +32,44 @@ parser.add_argument('--nonhybrid', action='store_true', help='global preference'
 parser.add_argument('--lr_dc', type=float, default=0.1, help='learning rate decay rate')
 parser.add_argument('--lr_dc_step', type=int, default=3, help='the number of steps after which the learning rate decay')
 opt = parser.parse_args()
-train_data = pickle.load(open('../datasets/' + opt.dataset + '/train.txt', 'rb'))
-test_data = pickle.load(open('../datasets/' + opt.dataset + '/test.txt', 'rb'))
+
+
+class Tee(object):
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data):
+        for stream in self.streams:
+            stream.write(data)
+            stream.flush()
+
+    def flush(self):
+        for stream in self.streams:
+            stream.flush()
+
+
+def setup_logging():
+    os.makedirs(opt.log_dir, exist_ok=True)
+    timestamp = time.strftime('%Y%m%d-%H%M%S')
+    run_name = opt.dataset if opt.dataset else 'run'
+    log_path = os.path.join(opt.log_dir, '%s-%s.log' % (run_name, timestamp))
+    log_file = open(log_path, 'a')
+    sys.stdout = Tee(sys.__stdout__, log_file)
+    sys.stderr = Tee(sys.__stderr__, log_file)
+    print('Log file: %s' % os.path.abspath(log_path))
+
+
+def resolve_dataset_dir():
+    if opt.data_path:
+        return opt.data_path
+    return os.path.join('..', 'datasets', opt.dataset)
+
+
+setup_logging()
+print(opt)
+dataset_dir = resolve_dataset_dir()
+train_data = pickle.load(open(os.path.join(dataset_dir, 'train.txt'), 'rb'))
+test_data = pickle.load(open(os.path.join(dataset_dir, 'test.txt'), 'rb'))
 # all_train_seq = pickle.load(open('../datasets/' + opt.dataset + '/all_train_seq.txt', 'rb'))
 if opt.dataset == 'diginetica':
     n_node = 43098
@@ -42,7 +83,6 @@ test_data = Data(test_data, sub_graph=True, method=opt.method, shuffle=False)
 model = GGNN(hidden_size=opt.hiddenSize, out_size=opt.hiddenSize, batch_size=opt.batchSize, n_node=n_node,
                  lr=opt.lr, l2=opt.l2,  step=opt.step, decay=opt.lr_dc_step * len(train_data.inputs) / opt.batchSize, lr_dc=opt.lr_dc,
                  nonhybrid=opt.nonhybrid)
-print(opt)
 best_result = [0, 0]
 best_epoch = [0, 0]
 for epoch in range(opt.epoch):

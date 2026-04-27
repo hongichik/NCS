@@ -7,13 +7,16 @@ Created on July, 2018
 """
 
 import argparse
+import os
 import pickle
+import sys
 import time
 from utils import build_graph, Data, split_validation
 from model import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='sample', help='dataset name: diginetica/yoochoose1_4/yoochoose1_64/sample')
+parser.add_argument('--data_path', default='', help='path to dataset folder that contains train.txt and test.txt')
 parser.add_argument('--batchSize', type=int, default=100, help='input batch size')
 parser.add_argument('--hiddenSize', type=int, default=100, help='hidden state size')
 parser.add_argument('--epoch', type=int, default=30, help='the number of epochs to train for')
@@ -26,17 +29,53 @@ parser.add_argument('--patience', type=int, default=10, help='the number of epoc
 parser.add_argument('--nonhybrid', action='store_true', help='only use the global preference to predict')
 parser.add_argument('--validation', action='store_true', help='validation')
 parser.add_argument('--valid_portion', type=float, default=0.1, help='split the portion of training set as validation set')
+parser.add_argument('--log_dir', default='../log', help='directory to store run logs')
 opt = parser.parse_args()
-print(opt)
+
+
+class Tee(object):
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data):
+        for stream in self.streams:
+            stream.write(data)
+            stream.flush()
+
+    def flush(self):
+        for stream in self.streams:
+            stream.flush()
+
+
+def setup_logging():
+    os.makedirs(opt.log_dir, exist_ok=True)
+    timestamp = time.strftime('%Y%m%d-%H%M%S')
+    run_name = opt.dataset if opt.dataset else 'run'
+    log_path = os.path.join(opt.log_dir, '%s-%s.log' % (run_name, timestamp))
+    log_file = open(log_path, 'a')
+    sys.stdout = Tee(sys.__stdout__, log_file)
+    sys.stderr = Tee(sys.__stderr__, log_file)
+    print('Log file: %s' % os.path.abspath(log_path))
+
+
+def resolve_dataset_dir():
+    if opt.data_path:
+        return opt.data_path
+    return os.path.join('..', 'datasets', opt.dataset)
 
 
 def main():
-    train_data = pickle.load(open('../datasets/' + opt.dataset + '/train.txt', 'rb'))
+    setup_logging()
+    print(opt)
+    dataset_dir = resolve_dataset_dir()
+    train_path = os.path.join(dataset_dir, 'train.txt')
+    test_path = os.path.join(dataset_dir, 'test.txt')
+    train_data = pickle.load(open(train_path, 'rb'))
     if opt.validation:
         train_data, valid_data = split_validation(train_data, opt.valid_portion)
         test_data = valid_data
     else:
-        test_data = pickle.load(open('../datasets/' + opt.dataset + '/test.txt', 'rb'))
+        test_data = pickle.load(open(test_path, 'rb'))
     # all_train_seq = pickle.load(open('../datasets/' + opt.dataset + '/all_train_seq.txt', 'rb'))
     # g = build_graph(all_train_seq)
     train_data = Data(train_data, shuffle=True)

@@ -38,7 +38,7 @@ class HyperConv(Module):
             final.append(item_embeddings)
       #  final1 = trans_to_cuda(torch.tensor([item.cpu().detach().numpy() for item in final]))
       #  item_embeddings = torch.sum(final1, 0)
-        item_embeddings = np.sum(final, 0) / (self.layers+1)
+        item_embeddings = torch.stack(final, dim=0).mean(dim=0)
         return item_embeddings
 
 
@@ -64,7 +64,7 @@ class LineConv(Module):
             session.append(session_emb_lgcn)
         #session1 = trans_to_cuda(torch.tensor([item.cpu().detach().numpy() for item in session]))
         #session_emb_lgcn = torch.sum(session1, 0)
-        session_emb_lgcn = np.sum(session, 0)/ (self.layers+1)
+        session_emb_lgcn = torch.stack(session, dim=0).mean(dim=0)
         return session_emb_lgcn
 
 
@@ -91,7 +91,7 @@ class DHCN(Module):
         i = torch.LongTensor(indices)
         v = torch.FloatTensor(values)
         shape = adjacency.shape
-        adjacency = torch.sparse.FloatTensor(i, v, torch.Size(shape))
+        adjacency = torch.sparse_coo_tensor(i, v, torch.Size(shape))
         self.adjacency = adjacency
         self.embedding = nn.Embedding(self.n_node, self.emb_size)
         self.pos_embedding = nn.Embedding(200, self.emb_size)

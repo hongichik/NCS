@@ -36,10 +36,14 @@ class Data():
         # with newer NumPy versions (ragged arrays are no longer inferred).
         self.raw = np.asarray(data[0], dtype=object)
         H_T = data_masks(self.raw, n_node)
-        BH_T = H_T.T.multiply(1.0/H_T.sum(axis=1).reshape(1, -1))
+        row_sum_ht = np.asarray(H_T.sum(axis=1)).reshape(1, -1)
+        row_sum_ht[row_sum_ht == 0] = 1.0
+        BH_T = H_T.T.multiply(1.0/row_sum_ht)
         BH_T = BH_T.T
         H = H_T.T
-        DH = H.T.multiply(1.0/H.sum(axis=1).reshape(1, -1))
+        row_sum_h = np.asarray(H.sum(axis=1)).reshape(1, -1)
+        row_sum_h[row_sum_h == 0] = 1.0
+        DH = H.T.multiply(1.0/row_sum_h)
         DH = DH.T
         DHBH_T = np.dot(DH,BH_T)
 

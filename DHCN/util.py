@@ -32,7 +32,9 @@ def split_validation(train_set, valid_portion):
 
 class Data():
     def __init__(self, data, shuffle=False, n_node=None):
-        self.raw = np.asarray(data[0])
+        # Sessions have variable lengths, so store as object array for compatibility
+        # with newer NumPy versions (ragged arrays are no longer inferred).
+        self.raw = np.asarray(data[0], dtype=object)
         H_T = data_masks(self.raw, n_node)
         BH_T = H_T.T.multiply(1.0/H_T.sum(axis=1).reshape(1, -1))
         BH_T = BH_T.T

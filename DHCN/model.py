@@ -49,8 +49,7 @@ class LineConv(Module):
         self.batch_size = batch_size
         self.layers = layers
     def forward(self, item_embedding, D, A, session_item, session_len):
-        zeros = torch.cuda.FloatTensor(1,self.emb_size).fill_(0)
-        # zeros = torch.zeros([1,self.emb_size])
+        zeros = torch.zeros(1, self.emb_size, device=item_embedding.device)
         item_embedding = torch.cat([zeros, item_embedding], 0)
         seq_h = []
         for i in torch.arange(len(session_item)):
@@ -94,7 +93,7 @@ class DHCN(Module):
         adjacency = torch.sparse_coo_tensor(i, v, torch.Size(shape))
         self.adjacency = adjacency
         self.embedding = nn.Embedding(self.n_node, self.emb_size)
-        self.pos_embedding = nn.Embedding(200, self.emb_size)
+        self.pos_embedding = nn.Embedding(5000, self.emb_size)
         self.HyperGraph = HyperConv(self.layers,dataset)
         self.LineGraph = LineConv(self.layers, self.batch_size)
         self.w_1 = nn.Linear(2 * self.emb_size, self.emb_size)
@@ -112,18 +111,19 @@ class DHCN(Module):
 
      
     def generate_sess_emb(self,item_embedding, session_item, session_len, reversed_sess_item, mask):
-        zeros = torch.cuda.FloatTensor(1, self.emb_size).fill_(0)
-        # zeros = torch.zeros(1, self.emb_size)
+        dev = item_embedding.device
+        zeros = torch.zeros(1, self.emb_size, device=dev)
         item_embedding = torch.cat([zeros, item_embedding], 0)
         get = lambda i: item_embedding[reversed_sess_item[i]]
-        seq_h = torch.cuda.FloatTensor(self.batch_size, list(reversed_sess_item.shape)[1], self.emb_size).fill_(0)
-        # seq_h = torch.zeros(self.batch_size, list(reversed_sess_item.shape)[1], self.emb_size)
+        seq_h = torch.zeros(self.batch_size, list(reversed_sess_item.shape)[1], self.emb_size, device=dev)
         for i in torch.arange(session_item.shape[0]):
             seq_h[i] = get(i)
         hs = torch.div(torch.sum(seq_h, 1), session_len)
         mask = mask.float().unsqueeze(-1)
         len = seq_h.shape[1]
-        pos_emb = self.pos_embedding.weight[:len]
+        max_pos = self.pos_embedding.num_embeddings
+        pos_idx = torch.arange(len, device=dev).clamp(max=max_pos - 1)
+        pos_emb = self.pos_embedding(pos_idx)
         pos_emb = pos_emb.unsqueeze(0).repeat(self.batch_size, 1, 1)
 
         hs = hs.unsqueeze(-2).repeat(1, len, 1)
@@ -136,12 +136,11 @@ class DHCN(Module):
         return select
 
     def generate_sess_emb_npos(self,item_embedding, session_item, session_len, reversed_sess_item, mask):
-        zeros = torch.cuda.FloatTensor(1, self.emb_size).fill_(0)
-        # zeros = torch.zeros(1, self.emb_size)
+        dev = item_embedding.device
+        zeros = torch.zeros(1, self.emb_size, device=dev)
         item_embedding = torch.cat([zeros, item_embedding], 0)
         get = lambda i: item_embedding[reversed_sess_item[i]]
-        seq_h = torch.cuda.FloatTensor(self.batch_size, list(reversed_sess_item.shape)[1], self.emb_size).fill_(0)
-        # seq_h = torch.zeros(self.batch_size, list(reversed_sess_item.shape)[1], self.emb_size)
+        seq_h = torch.zeros(self.batch_size, list(reversed_sess_item.shape)[1], self.emb_size, device=dev)
         for i in torch.arange(session_item.shape[0]):
             seq_h[i] = get(i)
         hs = torch.div(torch.sum(seq_h, 1), session_len)
@@ -172,8 +171,7 @@ class DHCN(Module):
 
         pos = score(sess_emb_hgnn, sess_emb_lgcn)
         neg1 = score(sess_emb_lgcn, row_column_shuffle(sess_emb_hgnn))
-        one = torch.cuda.FloatTensor(neg1.shape[0]).fill_(1)
-        # one = zeros = torch.ones(neg1.shape[0])
+        one = torch.ones(neg1.shape[0], device=neg1.device)
         con_loss = torch.sum(-torch.log(1e-8 + torch.sigmoid(pos))-torch.log(1e-8 + (one - torch.sigmoid(neg1))))
         return con_loss
 

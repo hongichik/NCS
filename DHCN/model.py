@@ -111,10 +111,7 @@ class DHCN(Module):
         dev = item_embedding.device
         zeros = torch.zeros(1, self.emb_size, device=dev)
         item_embedding = torch.cat([zeros, item_embedding], 0)
-        get = lambda i: item_embedding[reversed_sess_item[i]]
-        seq_h = torch.zeros(self.batch_size, list(reversed_sess_item.shape)[1], self.emb_size, device=dev)
-        for i in torch.arange(session_item.shape[0]):
-            seq_h[i] = get(i)
+        seq_h = item_embedding[reversed_sess_item]
         hs = torch.div(torch.sum(seq_h, 1), session_len)
         mask = mask.float().unsqueeze(-1)
         len = seq_h.shape[1]
@@ -225,7 +222,7 @@ def train_test(model, train_data, test_data):
         loss.backward()
         model.optimizer.step()
         total_loss += loss.item()
-        if batch_id % 200 == 0 or batch_id == len(slices):
+        if batch_id % 50 == 0 or batch_id == len(slices):
             print('training batch: %d/%d\tloss: %.4f' % (batch_id, len(slices), total_loss / batch_id))
     print('\tLoss:\t%.3f' % total_loss)
     top_K = [5, 10, 20]
@@ -252,7 +249,7 @@ def train_test(model, train_data, test_data):
                     metrics['mrr%d' %K].append(0)
                 else:
                     metrics['mrr%d' %K].append(1 / (np.where(prediction == target)[0][0]+1))
-        if batch_id % 200 == 0 or batch_id == len(slices):
+        if batch_id % 50 == 0 or batch_id == len(slices):
             print('predict batch: %d/%d' % (batch_id, len(slices)))
     return metrics, total_loss
 

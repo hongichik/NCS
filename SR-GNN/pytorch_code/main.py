@@ -30,6 +30,7 @@ parser.add_argument('--nonhybrid', action='store_true', help='only use the globa
 parser.add_argument('--validation', action='store_true', help='validation')
 parser.add_argument('--valid_portion', type=float, default=0.1, help='split the portion of training set as validation set')
 parser.add_argument('--log_dir', default='../log', help='directory to store run logs')
+parser.add_argument('--n_node', type=int, default=0, help='override number of nodes/items; 0 means auto')
 opt = parser.parse_args()
 
 
@@ -64,6 +65,21 @@ def resolve_dataset_dir():
     return os.path.join('..', 'datasets', opt.dataset)
 
 
+def infer_n_node(train_data, test_data):
+    max_item_id = 0
+    for data in (train_data, test_data):
+        if data is None:
+            continue
+        seqs, targets = data
+        if len(seqs) > 0:
+            seq_max = max([max(seq) if len(seq) > 0 else 0 for seq in seqs])
+            max_item_id = max(max_item_id, seq_max)
+        if len(targets) > 0:
+            max_item_id = max(max_item_id, int(max(targets)))
+    # Item ids are 1-based and 0 is padding, so add 1 for embedding size.
+    return int(max_item_id) + 1
+
+
 def main():
     setup_logging()
     print(opt)
@@ -81,12 +97,15 @@ def main():
     train_data = Data(train_data, shuffle=True)
     test_data = Data(test_data, shuffle=False)
     # del all_train_seq, g
-    if opt.dataset == 'diginetica':
+    if opt.n_node > 0:
+        n_node = opt.n_node
+    elif opt.dataset == 'diginetica':
         n_node = 43098
     elif opt.dataset == 'yoochoose1_64' or opt.dataset == 'yoochoose1_4':
         n_node = 37484
     else:
-        n_node = 310
+        n_node = infer_n_node(train_data, test_data)
+    print('Using n_node:', n_node)
 
     model = trans_to_cuda(SessionGraph(opt, n_node))
 

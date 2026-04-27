@@ -31,6 +31,7 @@ parser.add_argument('--step', type=int, default=1, help='gnn propogation steps')
 parser.add_argument('--nonhybrid', action='store_true', help='global preference')
 parser.add_argument('--lr_dc', type=float, default=0.1, help='learning rate decay rate')
 parser.add_argument('--lr_dc_step', type=int, default=3, help='the number of steps after which the learning rate decay')
+parser.add_argument('--n_node', type=int, default=0, help='override number of nodes/items; 0 means auto')
 opt = parser.parse_args()
 
 
@@ -65,18 +66,36 @@ def resolve_dataset_dir():
     return os.path.join('..', 'datasets', opt.dataset)
 
 
+def infer_n_node(train_data, test_data):
+    max_item_id = 0
+    for data in (train_data, test_data):
+        if data is None:
+            continue
+        seqs, targets = data
+        if len(seqs) > 0:
+            seq_max = max([max(seq) if len(seq) > 0 else 0 for seq in seqs])
+            max_item_id = max(max_item_id, seq_max)
+        if len(targets) > 0:
+            max_item_id = max(max_item_id, int(max(targets)))
+    # Item ids are 1-based and 0 is padding, so add 1 for embedding size.
+    return int(max_item_id) + 1
+
+
 setup_logging()
 print(opt)
 dataset_dir = resolve_dataset_dir()
 train_data = pickle.load(open(os.path.join(dataset_dir, 'train.txt'), 'rb'))
 test_data = pickle.load(open(os.path.join(dataset_dir, 'test.txt'), 'rb'))
 # all_train_seq = pickle.load(open('../datasets/' + opt.dataset + '/all_train_seq.txt', 'rb'))
-if opt.dataset == 'diginetica':
+if opt.n_node > 0:
+    n_node = opt.n_node
+elif opt.dataset == 'diginetica':
     n_node = 43098
 elif opt.dataset == 'yoochoose1_64' or opt.dataset == 'yoochoose1_4':
     n_node = 37484
 else:
-    n_node = 310
+    n_node = infer_n_node(train_data, test_data)
+print('Using n_node:', n_node)
 # g = build_graph(all_train_seq)
 train_data = Data(train_data, sub_graph=True, method=opt.method, shuffle=True)
 test_data = Data(test_data, sub_graph=True, method=opt.method, shuffle=False)

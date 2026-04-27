@@ -31,6 +31,9 @@ parser.add_argument('--validation', action='store_true', help='validation')
 parser.add_argument('--valid_portion', type=float, default=0.1, help='split the portion of training set as validation set')
 parser.add_argument('--log_dir', default='../log', help='directory to store run logs')
 parser.add_argument('--n_node', type=int, default=0, help='override number of nodes/items; 0 means auto')
+parser.add_argument('--max_session_len', type=int, default=0, help='truncate each session to last N items; 0 means no truncation')
+parser.add_argument('--max_train_samples', type=int, default=0, help='keep at most N train samples; 0 means keep all')
+parser.add_argument('--max_test_samples', type=int, default=0, help='keep at most N test samples; 0 means keep all')
 opt = parser.parse_args()
 
 
@@ -80,6 +83,24 @@ def infer_n_node(train_data, test_data):
     return int(max_item_id) + 1
 
 
+def get_dataset_stats(data):
+    seqs, _ = data
+    n_samples = len(seqs)
+    max_len = max([len(seq) for seq in seqs]) if n_samples > 0 else 0
+    avg_len = (sum([len(seq) for seq in seqs]) * 1.0 / n_samples) if n_samples > 0 else 0.0
+    return n_samples, max_len, avg_len
+
+
+def maybe_limit_data(data, max_session_len=0, max_samples=0):
+    seqs, targets = data
+    if max_session_len > 0:
+        seqs = [seq[-max_session_len:] for seq in seqs]
+    if max_samples > 0 and len(seqs) > max_samples:
+        seqs = seqs[-max_samples:]
+        targets = targets[-max_samples:]
+    return seqs, targets
+
+
 def main():
     setup_logging()
     print(opt)
@@ -92,11 +113,23 @@ def main():
         test_data = valid_data
     else:
         test_data = pickle.load(open(test_path, 'rb'))
+
+    tr_n, tr_max_len, tr_avg_len = get_dataset_stats(train_data)
+    te_n, te_max_len, te_avg_len = get_dataset_stats(test_data)
+    print('Before limiting - train samples: %d, max len: %d, avg len: %.2f' % (tr_n, tr_max_len, tr_avg_len))
+    print('Before limiting - test samples: %d, max len: %d, avg len: %.2f' % (te_n, te_max_len, te_avg_len))
+
+    train_data = maybe_limit_data(train_data, opt.max_session_len, opt.max_train_samples)
+    test_data = maybe_limit_data(test_data, opt.max_session_len, opt.max_test_samples)
+
+    tr_n, tr_max_len, tr_avg_len = get_dataset_stats(train_data)
+    te_n, te_max_len, te_avg_len = get_dataset_stats(test_data)
+    print('After limiting - train samples: %d, max len: %d, avg len: %.2f' % (tr_n, tr_max_len, tr_avg_len))
+    print('After limiting - test samples: %d, max len: %d, avg len: %.2f' % (te_n, te_max_len, te_avg_len))
+
     # all_train_seq = pickle.load(open('../datasets/' + opt.dataset + '/all_train_seq.txt', 'rb'))
     # g = build_graph(all_train_seq)
-    train_data = Data(train_data, shuffle=True)
-    test_data = Data(test_data, shuffle=False)
-    # del all_train_seq, g
+
     if opt.n_node > 0:
         n_node = opt.n_node
     elif opt.dataset == 'diginetica':
@@ -106,6 +139,10 @@ def main():
     else:
         n_node = infer_n_node(train_data, test_data)
     print('Using n_node:', n_node)
+
+    train_data = Data(train_data, shuffle=True)
+    test_data = Data(test_data, shuffle=False)
+    # del all_train_seq, g
 
     model = trans_to_cuda(SessionGraph(opt, n_node))
 

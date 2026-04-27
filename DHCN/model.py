@@ -51,11 +51,8 @@ class LineConv(Module):
     def forward(self, item_embedding, D, A, session_item, session_len):
         zeros = torch.zeros(1, self.emb_size, device=item_embedding.device)
         item_embedding = torch.cat([zeros, item_embedding], 0)
-        seq_h = []
-        for i in torch.arange(len(session_item)):
-            seq_h.append(torch.index_select(item_embedding, 0, session_item[i]))
-        seq_h1 = trans_to_cuda(torch.tensor([item.cpu().detach().numpy() for item in seq_h]))
-        session_emb_lgcn = torch.div(torch.sum(seq_h1, 1), session_len)
+        seq_h = item_embedding[session_item]
+        session_emb_lgcn = torch.div(torch.sum(seq_h, 1), session_len)
         session = [session_emb_lgcn]
         DA = torch.mm(D, A).float()
         for i in range(self.layers):
@@ -220,15 +217,16 @@ def train_test(model, train_data, test_data):
     torch.autograd.set_detect_anomaly(True)
     total_loss = 0.0
     slices = train_data.generate_batch(model.batch_size)
-    for i in slices:
+    for batch_id, i in enumerate(slices, 1):
         model.zero_grad()
         targets, scores, con_loss = forward(model, i, train_data)
         loss = model.loss_function(scores + 1e-8, targets)
         loss = loss + con_loss
         loss.backward()
-#        print(loss.item())
         model.optimizer.step()
-        total_loss += loss
+        total_loss += loss.item()
+        if batch_id % 200 == 0 or batch_id == len(slices):
+            print('training batch: %d/%d\tloss: %.4f' % (batch_id, len(slices), total_loss / batch_id))
     print('\tLoss:\t%.3f' % total_loss)
     top_K = [5, 10, 20]
     metrics = {}
@@ -239,7 +237,7 @@ def train_test(model, train_data, test_data):
 
     model.eval()
     slices = test_data.generate_batch(model.batch_size)
-    for i in slices:
+    for batch_id, i in enumerate(slices, 1):
         tar, scores, con_loss = forward(model, i, test_data)
         scores = trans_to_cpu(scores).detach().numpy()
         index = []
@@ -254,6 +252,8 @@ def train_test(model, train_data, test_data):
                     metrics['mrr%d' %K].append(0)
                 else:
                     metrics['mrr%d' %K].append(1 / (np.where(prediction == target)[0][0]+1))
+        if batch_id % 200 == 0 or batch_id == len(slices):
+            print('predict batch: %d/%d' % (batch_id, len(slices)))
     return metrics, total_loss
 
 

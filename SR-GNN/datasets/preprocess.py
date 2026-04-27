@@ -15,19 +15,25 @@ import datetime
 import os
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', default='sample', help='dataset name: diginetica/yoochoose/sample')
+parser.add_argument('--dataset', default='sample', help='dataset name: diginetica/yoochoose/sample/retailrocket')
+parser.add_argument('--data-path', default='./', help='path to data directory for retailrocket dataset')
+parser.add_argument('--output-path', default=None, help='path to output directory for processed data (default: dataset folder)')
 opt = parser.parse_args()
 print(opt)
 
 dataset = 'sample_train-item-views.csv'
 if opt.dataset == 'diginetica':
     dataset = 'train-item-views.csv'
-elif opt.dataset =='yoochoose':
+elif opt.dataset == 'yoochoose':
     dataset = 'yoochoose-clicks.dat'
+elif opt.dataset == 'retailrocket':
+    dataset = os.path.join(opt.data_path, 'events.csv')
 
 print("-- Starting @ %ss" % datetime.datetime.now())
 with open(dataset, "r") as f:
     if opt.dataset == 'yoochoose':
+        reader = csv.DictReader(f, delimiter=',')
+    elif opt.dataset == 'retailrocket':
         reader = csv.DictReader(f, delimiter=',')
     else:
         reader = csv.DictReader(f, delimiter=';')
@@ -36,40 +42,57 @@ with open(dataset, "r") as f:
     ctr = 0
     curid = -1
     curdate = None
+    
     for data in reader:
-        sessid = data['session_id']
-        if curdate and not curid == sessid:
-            date = ''
+        # Filter only view events for RetailRocket
+        if opt.dataset == 'retailrocket':
+            if data['event'] != 'view':
+                continue
+            sessid = data['visitorid']
+            item = data['itemid']
+            timestamp = int(data['timestamp']) / 1000  # Convert milliseconds to seconds
+            date = timestamp
+        else:
+            sessid = data['session_id']
+            if curdate and not curid == sessid:
+                date = ''
+                if opt.dataset == 'yoochoose':
+                    date = time.mktime(time.strptime(curdate[:19], '%Y-%m-%dT%H:%M:%S'))
+                else:
+                    date = time.mktime(time.strptime(curdate, '%Y-%m-%d'))
+                sess_date[curid] = date
+            curid = sessid
             if opt.dataset == 'yoochoose':
-                date = time.mktime(time.strptime(curdate[:19], '%Y-%m-%dT%H:%M:%S'))
+                item = data['item_id']
             else:
-                date = time.mktime(time.strptime(curdate, '%Y-%m-%d'))
-            sess_date[curid] = date
-        curid = sessid
-        if opt.dataset == 'yoochoose':
-            item = data['item_id']
-        else:
-            item = data['item_id'], int(data['timeframe'])
-        curdate = ''
-        if opt.dataset == 'yoochoose':
-            curdate = data['timestamp']
-        else:
-            curdate = data['eventdate']
+                item = data['item_id'], int(data['timeframe'])
+            curdate = ''
+            if opt.dataset == 'yoochoose':
+                curdate = data['timestamp']
+            else:
+                curdate = data['eventdate']
 
         if sessid in sess_clicks:
             sess_clicks[sessid] += [item]
         else:
             sess_clicks[sessid] = [item]
+        
+        if opt.dataset == 'retailrocket':
+            sess_date[sessid] = date
+            
         ctr += 1
-    date = ''
-    if opt.dataset == 'yoochoose':
-        date = time.mktime(time.strptime(curdate[:19], '%Y-%m-%dT%H:%M:%S'))
-    else:
-        date = time.mktime(time.strptime(curdate, '%Y-%m-%d'))
-        for i in list(sess_clicks):
-            sorted_clicks = sorted(sess_clicks[i], key=operator.itemgetter(1))
-            sess_clicks[i] = [c[0] for c in sorted_clicks]
-    sess_date[curid] = date
+    
+    # Handle last record for non-retailrocket datasets
+    if opt.dataset != 'retailrocket':
+        date = ''
+        if opt.dataset == 'yoochoose':
+            date = time.mktime(time.strptime(curdate[:19], '%Y-%m-%dT%H:%M:%S'))
+        else:
+            date = time.mktime(time.strptime(curdate, '%Y-%m-%d'))
+            for i in list(sess_clicks):
+                sorted_clicks = sorted(sess_clicks[i], key=operator.itemgetter(1))
+                sess_clicks[i] = [c[0] for c in sorted_clicks]
+        sess_date[curid] = date
 print("-- Reading data @ %ss" % datetime.datetime.now())
 
 # Filter out length 1 sessions
@@ -209,18 +232,21 @@ for seq in tes_seqs:
     all += len(seq)
 print('avg length: ', all/(len(tra_seqs) + len(tes_seqs) * 1.0))
 if opt.dataset == 'diginetica':
-    if not os.path.exists('diginetica'):
-        os.makedirs('diginetica')
-    pickle.dump(tra, open('diginetica/train.txt', 'wb'))
-    pickle.dump(tes, open('diginetica/test.txt', 'wb'))
-    pickle.dump(tra_seqs, open('diginetica/all_train_seq.txt', 'wb'))
+    output_dir = opt.output_path if opt.output_path else 'diginetica'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    pickle.dump(tra, open(os.path.join(output_dir, 'train.txt'), 'wb'))
+    pickle.dump(tes, open(os.path.join(output_dir, 'test.txt'), 'wb'))
+    pickle.dump(tra_seqs, open(os.path.join(output_dir, 'all_train_seq.txt'), 'wb'))
 elif opt.dataset == 'yoochoose':
-    if not os.path.exists('yoochoose1_4'):
-        os.makedirs('yoochoose1_4')
-    if not os.path.exists('yoochoose1_64'):
-        os.makedirs('yoochoose1_64')
-    pickle.dump(tes, open('yoochoose1_4/test.txt', 'wb'))
-    pickle.dump(tes, open('yoochoose1_64/test.txt', 'wb'))
+    output_dir1_4 = opt.output_path if opt.output_path else 'yoochoose1_4'
+    output_dir1_64 = opt.output_path if opt.output_path else 'yoochoose1_64'
+    if not os.path.exists(output_dir1_4):
+        os.makedirs(output_dir1_4)
+    if not os.path.exists(output_dir1_64):
+        os.makedirs(output_dir1_64)
+    pickle.dump(tes, open(os.path.join(output_dir1_4, 'test.txt'), 'wb'))
+    pickle.dump(tes, open(os.path.join(output_dir1_64, 'test.txt'), 'wb'))
 
     split4, split64 = int(len(tr_seqs) / 4), int(len(tr_seqs) / 64)
     print(len(tr_seqs[-split4:]))
@@ -229,17 +255,24 @@ elif opt.dataset == 'yoochoose':
     tra4, tra64 = (tr_seqs[-split4:], tr_labs[-split4:]), (tr_seqs[-split64:], tr_labs[-split64:])
     seq4, seq64 = tra_seqs[tr_ids[-split4]:], tra_seqs[tr_ids[-split64]:]
 
-    pickle.dump(tra4, open('yoochoose1_4/train.txt', 'wb'))
-    pickle.dump(seq4, open('yoochoose1_4/all_train_seq.txt', 'wb'))
+    pickle.dump(tra4, open(os.path.join(output_dir1_4, 'train.txt'), 'wb'))
+    pickle.dump(seq4, open(os.path.join(output_dir1_4, 'all_train_seq.txt'), 'wb'))
 
-    pickle.dump(tra64, open('yoochoose1_64/train.txt', 'wb'))
-    pickle.dump(seq64, open('yoochoose1_64/all_train_seq.txt', 'wb'))
-
+    pickle.dump(tra64, open(os.path.join(output_dir1_64, 'train.txt'), 'wb'))
+    pickle.dump(seq64, open(os.path.join(output_dir1_64, 'all_train_seq.txt'), 'wb'))
+elif opt.dataset == 'retailrocket':
+    output_dir = opt.output_path if opt.output_path else os.path.join(opt.data_path, 'preprocessed')
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    pickle.dump(tra, open(os.path.join(output_dir, 'train.txt'), 'wb'))
+    pickle.dump(tes, open(os.path.join(output_dir, 'test.txt'), 'wb'))
+    pickle.dump(tra_seqs, open(os.path.join(output_dir, 'all_train_seq.txt'), 'wb'))
 else:
-    if not os.path.exists('sample'):
-        os.makedirs('sample')
-    pickle.dump(tra, open('sample/train.txt', 'wb'))
-    pickle.dump(tes, open('sample/test.txt', 'wb'))
-    pickle.dump(tra_seqs, open('sample/all_train_seq.txt', 'wb'))
+    output_dir = opt.output_path if opt.output_path else 'sample'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    pickle.dump(tra, open(os.path.join(output_dir, 'train.txt'), 'wb'))
+    pickle.dump(tes, open(os.path.join(output_dir, 'test.txt'), 'wb'))
+    pickle.dump(tra_seqs, open(os.path.join(output_dir, 'all_train_seq.txt'), 'wb'))
 
 print('Done.')

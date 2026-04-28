@@ -191,7 +191,7 @@ def gauc_(user_len_list, pos_len_list, pos_rank_sum):
     # check positive and negative samples
     any_without_pos = np.any(pos_len_list == 0)
     any_without_neg = np.any(neg_len_list == 0)
-    non_zero_idx = np.full(len(user_len_list), True, dtype=np.bool)
+    non_zero_idx = np.full(len(user_len_list), True, dtype=bool)
     if any_without_pos:
         logger = getLogger()
         logger.warning(

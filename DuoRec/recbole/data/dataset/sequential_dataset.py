@@ -100,7 +100,8 @@ class SequentialDataset(Dataset):
                 delete_index = np.argwhere(all_index_same_id == index)
                 all_index_same_id_wo_self = np.delete(all_index_same_id, delete_index)
                 same_target_index.append(all_index_same_id_wo_self)
-            same_target_index = np.array(same_target_index)
+            # `same_target_index` is ragged (different lengths per row), so keep object dtype.
+            same_target_index = np.array(same_target_index, dtype=object)
             np.save(aug_path, same_target_index)
         
         return same_target_index

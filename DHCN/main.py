@@ -45,6 +45,8 @@ parser.add_argument('--n_node', type=int, default=None,
 parser.add_argument('--log', default=None,
                     help='đường dẫn file log (vd: logs/run.log). '
                          'Nếu không truyền thì chỉ in ra terminal.')
+parser.add_argument('--topk', default='5,10,20',
+                help='danh sách K để đánh giá, dạng csv. Ví dụ: 20 hoặc 5,10,20')
 
 opt = parser.parse_args()
 
@@ -58,6 +60,21 @@ if opt.log:
 print(opt)
 # os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 # torch.cuda.set_device(1)
+
+
+def parse_topk(topk_csv):
+    values = []
+    for x in str(topk_csv).split(','):
+        x = x.strip()
+        if not x:
+            continue
+        k = int(x)
+        if k <= 0:
+            raise ValueError('topk must contain positive integers')
+        values.append(k)
+    if not values:
+        raise ValueError('topk is empty')
+    return sorted(set(values))
 
 def main():
     # Xác định đường dẫn dataset
@@ -92,7 +109,7 @@ def main():
     test_data = Data(test_data, shuffle=True, n_node=n_node)
     model = trans_to_cuda(DHCN(adjacency=train_data.adjacency,n_node=n_node,lr=opt.lr, l2=opt.l2, beta=opt.beta, layers=opt.layer,emb_size=opt.embSize, batch_size=opt.batchSize,dataset=opt.dataset))
 
-    top_K = [5, 10, 20]
+    top_K = parse_topk(opt.topk)
     best_results = {}
     for K in top_K:
         best_results['epoch%d' % K] = [0, 0]
@@ -101,7 +118,7 @@ def main():
     for epoch in range(opt.epoch):
         print('-------------------------------------------------------')
         print('epoch: ', epoch)
-        metrics, total_loss = train_test(model, train_data, test_data)
+        metrics, total_loss = train_test(model, train_data, test_data, top_k=top_K)
         for K in top_K:
             metrics['hit%d' % K] = np.mean(metrics['hit%d' % K]) * 100
             metrics['mrr%d' % K] = np.mean(metrics['mrr%d' % K]) * 100

@@ -209,7 +209,7 @@ def forward(model, i, data):
     return tar, scores, con_loss
 
 
-def train_test(model, train_data, test_data):
+def train_test(model, train_data, test_data, top_k=None):
     print('start training: ', datetime.datetime.now())
     torch.autograd.set_detect_anomaly(True)
     total_loss = 0.0
@@ -225,7 +225,12 @@ def train_test(model, train_data, test_data):
         if batch_id % 50 == 0 or batch_id == len(slices):
             print('training batch: %d/%d\tloss: %.4f' % (batch_id, len(slices), total_loss / batch_id))
     print('\tLoss:\t%.3f' % total_loss)
-    top_K = [5, 10, 20]
+    if top_k is None:
+        top_K = [5, 10, 20]
+    else:
+        top_K = sorted(set(top_k))
+    max_k = max(top_K)
+
     metrics = {}
     for K in top_K:
         metrics['hit%d' % K] = []
@@ -239,7 +244,7 @@ def train_test(model, train_data, test_data):
         scores = trans_to_cpu(scores).detach().numpy()
         index = []
         for idd in range(model.batch_size):
-            index.append(find_k_largest(20, scores[idd]))
+            index.append(find_k_largest(max_k, scores[idd]))
         index = np.array(index)
         tar = trans_to_cpu(tar).detach().numpy()
         for K in top_K:

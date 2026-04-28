@@ -15,8 +15,8 @@ recbole.utils.case_study
 import numpy as np
 import torch
 
-from recbole.data_.dataloader.general_dataloader import GeneralFullDataLoader
-from recbole.data_.dataloader.sequential_dataloader import SequentialFullDataLoader
+from recbole.data.dataloader.general_dataloader import GeneralFullDataLoader
+from recbole.data.dataloader.sequential_dataloader import SequentialFullDataLoader
 
 
 @torch.no_grad()

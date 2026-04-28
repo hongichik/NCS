@@ -7,7 +7,7 @@ recbole.data.decisiontree_dataset
 ##########################
 """
 
-from recbole.data_.dataset import Dataset
+from recbole.data.dataset import Dataset
 from recbole.utils import FeatureType
 
 

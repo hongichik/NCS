@@ -15,9 +15,9 @@ recbole.data.dataloader.general_dataloader
 import numpy as np
 import torch
 
-from recbole.data_.dataloader.abstract_dataloader import AbstractDataLoader
-from recbole.data_.dataloader.neg_sample_mixin import NegSampleMixin, NegSampleByMixin
-from recbole.data_.interaction import Interaction, cat_interactions
+from recbole.data.dataloader.abstract_dataloader import AbstractDataLoader
+from recbole.data.dataloader.neg_sample_mixin import NegSampleMixin, NegSampleByMixin
+from recbole.data.interaction import Interaction, cat_interactions
 from recbole.utils import DataLoaderType, InputType
 
 

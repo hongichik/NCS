@@ -19,8 +19,8 @@ import numpy as np
 import torch
 from scipy.sparse import coo_matrix
 
-from recbole.data_.dataset import Dataset
-from recbole.data_.utils import dlapi
+from recbole.data.dataset import Dataset
+from recbole.data.utils import dlapi
 from recbole.utils import FeatureSource, FeatureType
 from recbole.utils.utils import set_color
 

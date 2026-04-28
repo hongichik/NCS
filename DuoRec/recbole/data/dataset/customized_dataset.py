@@ -11,7 +11,7 @@ We only recommend building customized datasets by inheriting.
 Customized datasets named ``[Model Name]Dataset`` can be automatically called.
 """
 
-from recbole.data_.dataset import Kg_Seq_Dataset
+from recbole.data.dataset import Kg_Seq_Dataset
 
 
 class GRU4RecKGDataset(Kg_Seq_Dataset):

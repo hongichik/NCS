@@ -17,9 +17,9 @@ import torch
 import random
 import math
 
-from recbole.data_.dataloader.abstract_dataloader import AbstractDataLoader
-from recbole.data_.dataloader.neg_sample_mixin import NegSampleByMixin, NegSampleMixin
-from recbole.data_.interaction import Interaction, cat_interactions
+from recbole.data.dataloader.abstract_dataloader import AbstractDataLoader
+from recbole.data.dataloader.neg_sample_mixin import NegSampleByMixin, NegSampleMixin
+from recbole.data.interaction import Interaction, cat_interactions
 from recbole.utils import DataLoaderType, FeatureSource, FeatureType, InputType
 
 

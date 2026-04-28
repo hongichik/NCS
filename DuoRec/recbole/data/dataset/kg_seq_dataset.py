@@ -7,7 +7,7 @@ recbole.data.kg_seq_dataset
 #############################
 """
 
-from recbole.data_.dataset import SequentialDataset, KnowledgeBasedDataset
+from recbole.data.dataset import SequentialDataset, KnowledgeBasedDataset
 
 
 class Kg_Seq_Dataset(SequentialDataset, KnowledgeBasedDataset):

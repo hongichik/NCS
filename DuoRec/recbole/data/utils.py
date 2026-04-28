@@ -18,7 +18,7 @@ import os
 import pickle
 
 from recbole.config import EvalSetting
-from recbole.data_.dataloader import *
+from recbole.data.dataloader import *
 from recbole.sampler import KGSampler, Sampler, RepeatableSampler
 from recbole.utils import ModelType, ensure_dir, get_local_time
 from recbole.utils.utils import set_color

@@ -12,7 +12,7 @@ recbole.data.dataloader.context_dataloader
 ################################################
 """
 
-from recbole.data_.dataloader.general_dataloader import GeneralDataLoader, GeneralNegSampleDataLoader, \
+from recbole.data.dataloader.general_dataloader import GeneralDataLoader, GeneralNegSampleDataLoader, \
     GeneralFullDataLoader
 
 

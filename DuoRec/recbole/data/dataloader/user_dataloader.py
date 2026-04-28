@@ -13,8 +13,8 @@ recbole.data.dataloader.user_dataloader
 """
 import torch
 
-from recbole.data_.dataloader import AbstractDataLoader
-from recbole.data_.interaction import Interaction
+from recbole.data.dataloader import AbstractDataLoader
+from recbole.data.interaction import Interaction
 from recbole.utils.enum_type import DataLoaderType, InputType
 
 

@@ -14,8 +14,8 @@ recbole.data.dataloader.dien_dataloader
 
 import torch
 
-from recbole.data_.dataloader.sequential_dataloader import SequentialDataLoader, SequentialNegSampleDataLoader, SequentialFullDataLoader
-from recbole.data_.interaction import Interaction, cat_interactions
+from recbole.data.dataloader.sequential_dataloader import SequentialDataLoader, SequentialNegSampleDataLoader, SequentialFullDataLoader
+from recbole.data.interaction import Interaction, cat_interactions
 from recbole.utils import DataLoaderType, FeatureSource, FeatureType, InputType
 from recbole.sampler import SeqSampler
 

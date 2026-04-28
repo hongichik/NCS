@@ -14,8 +14,8 @@ recbole.data.social_dataset
 
 import os
 
-from recbole.data_.dataset import Dataset
-from recbole.data_.utils import dlapi
+from recbole.data.dataset import Dataset
+from recbole.data.utils import dlapi
 from recbole.utils import FeatureSource
 from recbole.utils.utils import set_color
 

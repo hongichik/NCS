@@ -48,7 +48,7 @@ topk: [5, 10, 20, 50]
 
 # directory setting
 log_root: "./log/"
-data_path: "./dataset/"
+data_path: "/dataset/"
 
 lmd: 0.1
 lmd_sem: 0.1

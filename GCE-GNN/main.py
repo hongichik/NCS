@@ -83,9 +83,11 @@ parser.add_argument('--valid_portion', type=float, default=0.1, help='split the 
 parser.add_argument('--alpha', type=float, default=0.2, help='Alpha for the leaky_relu.')
 parser.add_argument('--patience', type=int, default=3)
 parser.add_argument('--auto_num_node', action='store_true', help='Auto-calculate num_node from data')
-parser.add_argument('--max_session_len', type=int, default=None, help='Compatibility arg (currently unused)')
-parser.add_argument('--max_train_samples', type=int, default=None, help='Compatibility arg (currently unused)')
-parser.add_argument('--max_test_samples', type=int, default=None, help='Compatibility arg (currently unused)')
+parser.add_argument('--max_session_len', type=int, default=None, help='Cap session length to reduce memory')
+parser.add_argument('--max_train_samples', type=int, default=None, help='Limit training samples to reduce memory')
+parser.add_argument('--max_test_samples', type=int, default=None, help='Limit test samples to reduce memory')
+parser.add_argument('--num_workers', type=int, default=0, help='DataLoader workers (0 reduces RAM spikes)')
+parser.add_argument('--pin_memory', action='store_true', help='Enable DataLoader pin_memory')
 
 opt = parser.parse_args()
 
@@ -111,6 +113,14 @@ def build_graph_cache_from_seq(seq, num_node, sample_num):
     return adj, weight
 
 
+def limit_samples(data_tuple, max_samples):
+    if max_samples is None:
+        return data_tuple
+    x, y = data_tuple
+    n = min(len(x), int(max_samples))
+    return x[:n], y[:n]
+
+
 def main():
     # Setup logging
     log_file = setup_logging(opt.log_dir, opt.dataset)
@@ -123,6 +133,10 @@ def main():
     dataset_path = os.path.join(opt.data_path, opt.dataset)
     if os.path.exists(os.path.join(opt.data_path, 'train.txt')):
         dataset_path = opt.data_path
+
+    # Safer defaults for large datasets if user does not pass explicit caps
+    if opt.dataset.lower() == 'retailrocket' and opt.max_session_len is None:
+        opt.max_session_len = 20
     
     # Load training data first to calculate num_node if needed
     train_data_file = os.path.join(dataset_path, 'train.txt')
@@ -159,6 +173,9 @@ def main():
         test_data_file = os.path.join(dataset_path, 'test.txt')
         test_data = pickle.load(open(test_data_file, 'rb'))
 
+    train_data = limit_samples(train_data, opt.max_train_samples)
+    test_data = limit_samples(test_data, opt.max_test_samples)
+
     adj_file = os.path.join(dataset_path, f'adj_{opt.n_sample_all}.pkl')
     num_file = os.path.join(dataset_path, f'num_{opt.n_sample_all}.pkl')
     
@@ -179,8 +196,11 @@ def main():
 
     adj = pickle.load(open(adj_file, 'rb'))
     num = pickle.load(open(num_file, 'rb'))
-    train_data = Data(train_data)
-    test_data = Data(test_data)
+    logger.info(f"train samples: {len(train_data[0])}, test samples: {len(test_data[0])}")
+    logger.info(f"max_session_len: {opt.max_session_len}, num_workers: {opt.num_workers}, pin_memory: {opt.pin_memory}")
+
+    train_data = Data(train_data, train_len=opt.max_session_len)
+    test_data = Data(test_data, train_len=opt.max_session_len)
 
     adj, num = handle_adj(adj, num_node, opt.n_sample_all, num)
     model = trans_to_cuda(CombineGraph(opt, num_node, adj, num))

@@ -178,8 +178,13 @@ def train_test(model, train_data, test_data):
     print('start training: ', datetime.datetime.now())
     model.train()
     total_loss = 0.0
-    train_loader = torch.utils.data.DataLoader(train_data, num_workers=4, batch_size=model.batch_size,
-                                               shuffle=True, pin_memory=True)
+    train_loader = torch.utils.data.DataLoader(
+        train_data,
+        num_workers=model.opt.num_workers,
+        batch_size=model.batch_size,
+        shuffle=True,
+        pin_memory=model.opt.pin_memory,
+    )
     for data in tqdm(train_loader):
         model.optimizer.zero_grad()
         targets, scores = forward(model, data)
@@ -193,8 +198,13 @@ def train_test(model, train_data, test_data):
 
     print('start predicting: ', datetime.datetime.now())
     model.eval()
-    test_loader = torch.utils.data.DataLoader(test_data, num_workers=4, batch_size=model.batch_size,
-                                              shuffle=False, pin_memory=True)
+    test_loader = torch.utils.data.DataLoader(
+        test_data,
+        num_workers=model.opt.num_workers,
+        batch_size=model.batch_size,
+        shuffle=False,
+        pin_memory=model.opt.pin_memory,
+    )
     result = []
     hit, mrr = [], []
     for data in test_loader:

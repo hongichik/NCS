@@ -83,8 +83,32 @@ parser.add_argument('--valid_portion', type=float, default=0.1, help='split the 
 parser.add_argument('--alpha', type=float, default=0.2, help='Alpha for the leaky_relu.')
 parser.add_argument('--patience', type=int, default=3)
 parser.add_argument('--auto_num_node', action='store_true', help='Auto-calculate num_node from data')
+parser.add_argument('--max_session_len', type=int, default=None, help='Compatibility arg (currently unused)')
+parser.add_argument('--max_train_samples', type=int, default=None, help='Compatibility arg (currently unused)')
+parser.add_argument('--max_test_samples', type=int, default=None, help='Compatibility arg (currently unused)')
 
 opt = parser.parse_args()
+
+
+def build_graph_cache_from_seq(seq, num_node, sample_num):
+    """Build adjacency and weight cache, equivalent to build_graph.py behavior."""
+    adj_count = [dict() for _ in range(num_node)]
+
+    for data in seq:
+        for k in range(1, 4):
+            for j in range(len(data) - k):
+                u, v = data[j], data[j + k]
+                if 0 <= u < num_node and 0 <= v < num_node:
+                    adj_count[u][v] = adj_count[u].get(v, 0) + 1
+                    adj_count[v][u] = adj_count[v].get(u, 0) + 1
+
+    adj = [[] for _ in range(num_node)]
+    weight = [[] for _ in range(num_node)]
+    for node in range(num_node):
+        pairs = sorted(adj_count[node].items(), key=lambda x: x[1], reverse=True)
+        adj[node] = [v for v, _ in pairs[:sample_num]]
+        weight[node] = [w for _, w in pairs[:sample_num]]
+    return adj, weight
 
 
 def main():
@@ -97,6 +121,8 @@ def main():
     
     # Build dataset path
     dataset_path = os.path.join(opt.data_path, opt.dataset)
+    if os.path.exists(os.path.join(opt.data_path, 'train.txt')):
+        dataset_path = opt.data_path
     
     # Load training data first to calculate num_node if needed
     train_data_file = os.path.join(dataset_path, 'train.txt')
@@ -136,6 +162,21 @@ def main():
     adj_file = os.path.join(dataset_path, f'adj_{opt.n_sample_all}.pkl')
     num_file = os.path.join(dataset_path, f'num_{opt.n_sample_all}.pkl')
     
+    if not os.path.exists(adj_file) or not os.path.exists(num_file):
+        logger.info('adj/num cache not found, building graph cache from training sequences...')
+        seq_file = os.path.join(dataset_path, 'all_train_seq.txt')
+        if os.path.exists(seq_file):
+            seq = pickle.load(open(seq_file, 'rb'))
+        else:
+            # Fallback: derive sequences from train.txt format (x, y)
+            seq = train_data[0]
+
+        adj_raw, num_raw = build_graph_cache_from_seq(seq, num_node, opt.n_sample_all)
+        pickle.dump(adj_raw, open(adj_file, 'wb'))
+        pickle.dump(num_raw, open(num_file, 'wb'))
+        logger.info(f'Built and saved: {adj_file}')
+        logger.info(f'Built and saved: {num_file}')
+
     adj = pickle.load(open(adj_file, 'rb'))
     num = pickle.load(open(num_file, 'rb'))
     train_data = Data(train_data)

@@ -4,7 +4,7 @@ import pickle
 import os
 import sys
 import logging
-from datetime import datetime
+import datetime as dt
 from model import *
 from utils import *
 
@@ -13,7 +13,7 @@ def setup_logging(log_dir, dataset_name):
     """Setup logging to file and console"""
     os.makedirs(log_dir, exist_ok=True)
     
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = os.path.join(log_dir, f"{dataset_name}_{timestamp}.log")
     
     # Create formatter

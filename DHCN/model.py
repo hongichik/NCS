@@ -33,6 +33,7 @@ class HyperConv(Module):
         item_embeddings = embedding
         item_embedding_layer0 = item_embeddings
         final = [item_embedding_layer0]
+        adjacency = adjacency.to(embedding.device)
         for i in range(self.layers):
             item_embeddings = torch.sparse.mm(adjacency, item_embeddings)
             final.append(item_embeddings)

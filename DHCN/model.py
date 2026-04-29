@@ -215,6 +215,7 @@ def train_test(model, train_data, test_data, top_k=None):
     model.train()
     total_loss = 0.0
     slices = train_data.generate_batch(model.batch_size)
+    train_start = time.time()
     for batch_id, i in enumerate(slices, 1):
         model.zero_grad()
         targets, scores, con_loss = forward(model, i, train_data)
@@ -224,7 +225,18 @@ def train_test(model, train_data, test_data, top_k=None):
         model.optimizer.step()
         total_loss += loss.item()
         if batch_id % 50 == 0 or batch_id == len(slices):
-            print('training batch: %d/%d\tloss: %.4f' % (batch_id, len(slices), total_loss / batch_id))
+            elapsed = time.time() - train_start
+            it_per_sec = batch_id / max(elapsed, 1e-8)
+            remaining = len(slices) - batch_id
+            eta_seconds = int(remaining / max(it_per_sec, 1e-8))
+            eta = datetime.timedelta(seconds=eta_seconds)
+            print('training batch: %d/%d\tloss: %.4f\tit/s: %.2f\teta: %s' % (
+                batch_id,
+                len(slices),
+                total_loss / batch_id,
+                it_per_sec,
+                eta,
+            ))
     print('\tLoss:\t%.3f' % total_loss)
     if top_k is None:
         top_K = [5, 10, 20]

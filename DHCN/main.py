@@ -2,6 +2,7 @@ import argparse
 import pickle
 import time
 import sys
+import torch
 from util import Data, split_validation
 from model import *
 import os
@@ -108,6 +109,9 @@ def main():
     train_data = Data(train_data, shuffle=True, n_node=n_node)
     test_data = Data(test_data, shuffle=True, n_node=n_node)
     model = trans_to_cuda(DHCN(adjacency=train_data.adjacency,n_node=n_node,lr=opt.lr, l2=opt.l2, beta=opt.beta, layers=opt.layer,emb_size=opt.embSize, batch_size=opt.batchSize,dataset=opt.dataset))
+    if torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = True
+    print('Using device =', next(model.parameters()).device)
 
     top_K = parse_topk(opt.topk)
     best_results = {}

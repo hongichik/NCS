@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, coo_matrix
 from operator import itemgetter
 
 def data_masks(all_sessions, n_node):
@@ -54,20 +54,41 @@ class Data():
         self.shuffle = shuffle
 
     def get_overlap(self, sessions):
-        matrix = np.zeros((len(sessions), len(sessions)))
-        for i in range(len(sessions)):
-            seq_a = set(sessions[i])
-            seq_a.discard(0)
-            for j in range(i+1, len(sessions)):
-                seq_b = set(sessions[j])
-                seq_b.discard(0)
-                overlap = seq_a.intersection(seq_b)
-                ab_set = seq_a | seq_b
-                matrix[i][j] = float(len(overlap))/float(len(ab_set))
-                matrix[j][i] = matrix[i][j]
-        matrix = matrix + np.diag([1.0]*len(sessions))
-        degree = np.sum(np.array(matrix), 1)
-        degree = np.diag(1.0/degree)
+        n_sessions = len(sessions)
+        rows, cols = [], []
+        item_to_col = {}
+
+        for r, session in enumerate(sessions):
+            unique_items = np.unique(session)
+            unique_items = unique_items[unique_items != 0]
+            for item in unique_items:
+                item = int(item)
+                c = item_to_col.get(item)
+                if c is None:
+                    c = len(item_to_col)
+                    item_to_col[item] = c
+                rows.append(r)
+                cols.append(c)
+
+        if item_to_col:
+            data = np.ones(len(rows), dtype=np.float32)
+            incidence = coo_matrix((data, (rows, cols)), shape=(n_sessions, len(item_to_col))).tocsr()
+            intersection = (incidence @ incidence.T).toarray().astype(np.float32)
+            cnt = np.asarray(incidence.sum(axis=1)).reshape(-1, 1)
+            union = cnt + cnt.T - intersection
+            matrix = np.divide(
+                intersection,
+                union,
+                out=np.zeros_like(intersection, dtype=np.float32),
+                where=union != 0,
+            )
+        else:
+            matrix = np.zeros((n_sessions, n_sessions), dtype=np.float32)
+
+        np.fill_diagonal(matrix, 1.0)
+        degree = np.sum(matrix, 1)
+        degree[degree == 0] = 1.0
+        degree = np.diag(1.0 / degree)
         return matrix, degree
 
     def generate_batch(self, batch_size):

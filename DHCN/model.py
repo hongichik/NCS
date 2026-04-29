@@ -197,13 +197,14 @@ def find_k_largest(K, candidates):
 def forward(model, i, data):
     tar, session_len, session_item, reversed_sess_item, mask = data.get_slice(i)
     A_hat, D_hat = data.get_overlap(session_item)
-    session_item = trans_to_cuda(torch.Tensor(session_item).long())
-    session_len = trans_to_cuda(torch.Tensor(session_len).long())
-    A_hat = trans_to_cuda(torch.Tensor(A_hat))
-    D_hat = trans_to_cuda(torch.Tensor(D_hat))
-    tar = trans_to_cuda(torch.Tensor(tar).long())
-    mask = trans_to_cuda(torch.Tensor(mask).long())
-    reversed_sess_item = trans_to_cuda(torch.Tensor(reversed_sess_item).long())
+    dev = model.embedding.weight.device
+    session_item = torch.as_tensor(session_item, dtype=torch.long, device=dev)
+    session_len = torch.as_tensor(session_len, dtype=torch.long, device=dev)
+    A_hat = torch.as_tensor(A_hat, dtype=torch.float32, device=dev)
+    D_hat = torch.as_tensor(D_hat, dtype=torch.float32, device=dev)
+    tar = torch.as_tensor(tar, dtype=torch.long, device=dev)
+    mask = torch.as_tensor(mask, dtype=torch.long, device=dev)
+    reversed_sess_item = torch.as_tensor(reversed_sess_item, dtype=torch.long, device=dev)
     item_emb_hg, sess_emb_hgnn, con_loss = model(session_item, session_len, D_hat, A_hat, reversed_sess_item, mask)
     scores = torch.mm(sess_emb_hgnn, torch.transpose(item_emb_hg, 1,0))
     return tar, scores, con_loss
@@ -211,7 +212,7 @@ def forward(model, i, data):
 
 def train_test(model, train_data, test_data, top_k=None):
     print('start training: ', datetime.datetime.now())
-    torch.autograd.set_detect_anomaly(True)
+    model.train()
     total_loss = 0.0
     slices = train_data.generate_batch(model.batch_size)
     for batch_id, i in enumerate(slices, 1):
@@ -239,23 +240,28 @@ def train_test(model, train_data, test_data, top_k=None):
 
     model.eval()
     slices = test_data.generate_batch(model.batch_size)
-    for batch_id, i in enumerate(slices, 1):
-        tar, scores, con_loss = forward(model, i, test_data)
-        scores = trans_to_cpu(scores).detach().numpy()
-        index = []
-        for idd in range(model.batch_size):
-            index.append(find_k_largest(max_k, scores[idd]))
-        index = np.array(index)
-        tar = trans_to_cpu(tar).detach().numpy()
-        for K in top_K:
-            for prediction, target in zip(index[:, :K], tar):
-                metrics['hit%d' %K].append(np.isin(target, prediction))
-                if len(np.where(prediction == target)[0]) == 0:
-                    metrics['mrr%d' %K].append(0)
-                else:
-                    metrics['mrr%d' %K].append(1 / (np.where(prediction == target)[0][0]+1))
-        if batch_id % 50 == 0 or batch_id == len(slices):
-            print('predict batch: %d/%d' % (batch_id, len(slices)))
+    with torch.no_grad():
+        for batch_id, i in enumerate(slices, 1):
+            tar, scores, con_loss = forward(model, i, test_data)
+            index = torch.topk(scores, k=max_k, dim=1).indices
+            tar = tar.view(-1, 1)
+
+            for K in top_K:
+                pred_k = index[:, :K]
+                hit_mask = (pred_k == tar)
+                hit_any = hit_mask.any(dim=1).float()
+                metrics['hit%d' % K].extend(trans_to_cpu(hit_any).numpy().tolist())
+
+                hit_pos = torch.argmax(hit_mask.int(), dim=1) + 1
+                mrr = torch.where(
+                    hit_any > 0,
+                    1.0 / hit_pos.float(),
+                    torch.zeros_like(hit_any),
+                )
+                metrics['mrr%d' % K].extend(trans_to_cpu(mrr).numpy().tolist())
+
+            if batch_id % 50 == 0 or batch_id == len(slices):
+                print('predict batch: %d/%d' % (batch_id, len(slices)))
     return metrics, total_loss
 
 

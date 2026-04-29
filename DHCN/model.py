@@ -34,7 +34,7 @@ class HyperConv(Module):
         item_embedding_layer0 = item_embeddings
         final = [item_embedding_layer0]
         for i in range(self.layers):
-            item_embeddings = torch.sparse.mm(trans_to_cuda(adjacency), item_embeddings)
+            item_embeddings = torch.sparse.mm(adjacency, item_embeddings)
             final.append(item_embeddings)
       #  final1 = trans_to_cuda(torch.tensor([item.cpu().detach().numpy() for item in final]))
       #  item_embeddings = torch.sum(final1, 0)
@@ -133,10 +133,7 @@ class DHCN(Module):
         dev = item_embedding.device
         zeros = torch.zeros(1, self.emb_size, device=dev)
         item_embedding = torch.cat([zeros, item_embedding], 0)
-        get = lambda i: item_embedding[reversed_sess_item[i]]
-        seq_h = torch.zeros(self.batch_size, list(reversed_sess_item.shape)[1], self.emb_size, device=dev)
-        for i in torch.arange(session_item.shape[0]):
-            seq_h[i] = get(i)
+        seq_h = item_embedding[reversed_sess_item]
         hs = torch.div(torch.sum(seq_h, 1), session_len)
         mask = mask.float().unsqueeze(-1)
         len = seq_h.shape[1]

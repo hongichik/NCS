@@ -88,7 +88,7 @@ class DHCN(Module):
         v = torch.FloatTensor(values)
         shape = adjacency.shape
         adjacency = torch.sparse_coo_tensor(i, v, torch.Size(shape))
-        self.adjacency = adjacency
+        self.register_buffer('adjacency', adjacency)
         self.embedding = nn.Embedding(self.n_node, self.emb_size)
         self.pos_embedding = nn.Embedding(5000, self.emb_size)
         self.HyperGraph = HyperConv(self.layers,dataset)

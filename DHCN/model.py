@@ -33,7 +33,6 @@ class HyperConv(Module):
         item_embeddings = embedding
         item_embedding_layer0 = item_embeddings
         final = [item_embedding_layer0]
-        adjacency = adjacency.to(embedding.device)
         for i in range(self.layers):
             item_embeddings = torch.sparse.mm(adjacency, item_embeddings)
             final.append(item_embeddings)
@@ -168,6 +167,9 @@ class DHCN(Module):
         return con_loss
 
     def forward(self, session_item, session_len, D, A, reversed_sess_item, mask):
+        dev = self.embedding.weight.device
+        if self.adjacency.device != dev:
+            self.adjacency = self.adjacency.to(dev)
         item_embeddings_hg = self.HyperGraph(self.adjacency, self.embedding.weight)
         if self.dataset == 'Tmall':
             sess_emb_hgnn = self.generate_sess_emb_npos(item_embeddings_hg, session_item, session_len, reversed_sess_item, mask)

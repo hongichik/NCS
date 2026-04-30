@@ -109,8 +109,9 @@ def split_validation(train_set, valid_portion):
 
 class Data():
     def __init__(self, data, cate, shuffle=False, n_node=None, c_node=None):
-        self.raw = np.asarray(data[0]) #将data中的第一个元素转换为NumPy数组,并将转换后的数组赋值给self.raw属性
-        self.cate_raw = np.asarray(cate[0])
+        # NumPy>=1.24 raises on ragged nested sequences unless dtype=object is explicit.
+        self.raw = np.asarray(data[0], dtype=object) #将data中的第一个元素转换为NumPy数组,并将转换后的数组赋值给self.raw属性
+        self.cate_raw = np.asarray(cate[0], dtype=object)
         H_T = data_masks(self.raw, self.cate_raw, n_node, c_node)
 		#1.将H_T的每个元素除以对应行的和,得到新的稀疏矩阵2.将这个新稀疏矩阵与H_T.T(转置)逐元素相乘,得到一个新的稀疏矩阵BH_T。
         BH_T = H_T.T.multiply(1.0 / H_T.sum(axis=1).reshape(1, -1))#.reshape(1, -1)将结果重新排列为一个行向量,sum(axis=1)计算H_T每行的和

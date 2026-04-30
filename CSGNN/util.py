@@ -112,6 +112,25 @@ class Data():
         # NumPy>=1.24 raises on ragged nested sequences unless dtype=object is explicit.
         self.raw = np.asarray(data[0], dtype=object) #将data中的第一个元素转换为NumPy数组,并将转换后的数组赋值给self.raw属性
         self.cate_raw = np.asarray(cate[0], dtype=object)
+        self.targets = np.asarray(data[1])
+
+        # Auto-expand node/category spaces when dataset IDs exceed hardcoded values.
+        max_item_in_sessions = max((max(session) for session in self.raw if len(session) > 0), default=0)
+        max_item_in_targets = int(np.max(self.targets)) if self.targets.size > 0 else 0
+        inferred_n_node = max_item_in_sessions if max_item_in_sessions > max_item_in_targets else max_item_in_targets
+        if n_node is None or n_node < inferred_n_node:
+            n_node = inferred_n_node
+
+        max_cat_in_sessions = max((max(category) for category in self.cate_raw if len(category) > 0), default=0)
+        max_cat_in_targets = 0
+        if len(cate) > 1:
+            cate_targets = np.asarray(cate[1])
+            if cate_targets.size > 0:
+                max_cat_in_targets = int(np.max(cate_targets))
+        inferred_c_node = max_cat_in_sessions if max_cat_in_sessions > max_cat_in_targets else max_cat_in_targets
+        if c_node is None or c_node < inferred_c_node:
+            c_node = inferred_c_node
+
         H_T = data_masks(self.raw, self.cate_raw, n_node, c_node)
 		#1.将H_T的每个元素除以对应行的和,得到新的稀疏矩阵2.将这个新稀疏矩阵与H_T.T(转置)逐元素相乘,得到一个新的稀疏矩阵BH_T。
         BH_T = H_T.T.multiply(1.0 / H_T.sum(axis=1).reshape(1, -1))#.reshape(1, -1)将结果重新排列为一个行向量,sum(axis=1)计算H_T每行的和
@@ -124,7 +143,7 @@ class Data():
 #tocoo()用于将稀疏矩阵转换为COO格式(用于表示稀疏矩阵的格式，它存储非零元素的坐标及对应的值)
         self.adjacency = DHBH_T.tocoo()
         self.n_node = n_node
-        self.targets = np.asarray(data[1])
+        self.c_node = c_node
         self.length = len(self.raw)
         self.shuffle = shuffle
 

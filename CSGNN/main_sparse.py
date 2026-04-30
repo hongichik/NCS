@@ -48,37 +48,24 @@ def main():
     print('-----train length: %d ----' % len(train_data[0]))
     print('-----test length: %d ----' % len(test_data[0]))
 
-    if opt.dataset == 'diginetica':
-        # filer5
-        # n_node = 30321
-        # c_node = 817
-        # filer10
-        # n_node = 16595
-        # c_node = 605
-        # filer15
-        # n_node = 10831
-        # c_node = 454
-        # filer20
-        n_node = 7612
-        c_node = 370
-    elif opt.dataset == 'nowplaying':
-        # filer5
-        # n_node = 24665
-        # c_node = 5694
-        # filer10
-        # n_node = 16365
-        # c_node = 4195
-        # filer15
-        # n_node = 12055
-        # c_node = 3273
-        # filer20
-        n_node = 47705
-        c_node = 9386
-    else:
-        n_node = 309
-        c_node = 5694
+    max_item_session = max(
+        max((max(session) for session in train_data[0] if len(session) > 0), default=0),
+        max((max(session) for session in test_data[0] if len(session) > 0), default=0)
+    )
+    max_item_target = max(int(np.max(train_data[1])), int(np.max(test_data[1])))
+    n_node = max(max_item_session, max_item_target)
+
+    max_cat_session = max(
+        max((max(category) for category in train_cate[0] if len(category) > 0), default=0),
+        max((max(category) for category in test_cate[0] if len(category) > 0), default=0)
+    )
+    max_cat_target = 0
+    if len(train_cate) > 1 and len(test_cate) > 1:
+        max_cat_target = max(int(np.max(train_cate[1])), int(np.max(test_cate[1])))
+    c_node = max(max_cat_session, max_cat_target)
     train_data = Data(train_data, train_cate, shuffle=True, n_node=n_node, c_node=c_node)
     test_data = Data(test_data, test_cate, shuffle=True, n_node=n_node, c_node=c_node)
+    n_node, c_node = train_data.n_node, train_data.c_node
     # embedding_matrix = get_embedding(opt.dataset, n_node + c_node, opt.embSize)
     # 不使用预训练的结果
     embedding_matrix = None

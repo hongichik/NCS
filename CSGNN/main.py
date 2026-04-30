@@ -57,36 +57,26 @@ def main():
     print('-----train length: %d ----' % len(train_data[0]))
     print('-----test length: %d ----' % len(test_data[0]))
 
-    if opt.dataset == 'diginetica':
-        n_node = 1979
-        c_node = 89
-    elif opt.dataset == 'TKY':
-        n_node = 28686
-        c_node = 233
-    elif opt.dataset == 'NYC':
-        n_node = 17875
-        c_node = 248
-    elif opt.dataset == 'lastfm':
-        n_node = 7059
-        c_node = 7263
-    elif opt.dataset == 'tmall0724':
-        n_node = 42883
-        c_node = 653
-    elif opt.dataset == 'sample1':
-        n_node = 15
-        c_node = 5
-    elif opt.dataset == 'music':
-        n_node = 34531
-        c_node = 4867
-    elif opt.dataset == 'nowplaying':
-        n_node = 540
-        c_node = 171
-    else:
-        n_node = 309
-        c_node = 5694
+    # Derive ID spaces from actual train+test data to avoid hardcoded mismatches.
+    max_item_session = max(
+        max((max(session) for session in train_data[0] if len(session) > 0), default=0),
+        max((max(session) for session in test_data[0] if len(session) > 0), default=0)
+    )
+    max_item_target = max(int(np.max(train_data[1])), int(np.max(test_data[1])))
+    n_node = max(max_item_session, max_item_target)
+
+    max_cat_session = max(
+        max((max(category) for category in train_cate[0] if len(category) > 0), default=0),
+        max((max(category) for category in test_cate[0] if len(category) > 0), default=0)
+    )
+    max_cat_target = 0
+    if len(train_cate) > 1 and len(test_cate) > 1:
+        max_cat_target = max(int(np.max(train_cate[1])), int(np.max(test_cate[1])))
+    c_node = max(max_cat_session, max_cat_target)
 	#在每个epoch开始前对训练数据进行打乱，防止模型学习到数据的特定顺序：shuffle=True,Data()在util中
     train_data = Data(train_data, train_cate, shuffle=True, n_node=n_node, c_node=c_node)
     test_data = Data(test_data, test_cate, shuffle=True, n_node=n_node, c_node=c_node)
+    n_node, c_node = train_data.n_node, train_data.c_node
     # embedding_matrix = get_embedding(opt.dataset, n_node + c_node, opt.embSize)
     embedding_matrix = None
     model = trans_to_cuda(

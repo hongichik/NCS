@@ -133,11 +133,15 @@ class Data():
 
         H_T = data_masks(self.raw, self.cate_raw, n_node, c_node)
 		#1.将H_T的每个元素除以对应行的和,得到新的稀疏矩阵2.将这个新稀疏矩阵与H_T.T(转置)逐元素相乘,得到一个新的稀疏矩阵BH_T。
-        BH_T = H_T.T.multiply(1.0 / H_T.sum(axis=1).reshape(1, -1))#.reshape(1, -1)将结果重新排列为一个行向量,sum(axis=1)计算H_T每行的和
+        h_t_row_sum = np.asarray(H_T.sum(axis=1)).reshape(-1)
+        h_t_row_inv = np.divide(1.0, h_t_row_sum, out=np.zeros_like(h_t_row_sum, dtype=float), where=h_t_row_sum != 0)
+        BH_T = H_T.T.multiply(h_t_row_inv.reshape(1, -1))#.reshape(1, -1)将结果重新排列为一个行向量,sum(axis=1)计算H_T每行的和
         BH_T = BH_T.T
         H = H_T.T
 		#DH同上BH_T，是进行归一化处理
-        DH = H.T.multiply(1.0 / H.sum(axis=1).reshape(1, -1))
+        h_row_sum = np.asarray(H.sum(axis=1)).reshape(-1)
+        h_row_inv = np.divide(1.0, h_row_sum, out=np.zeros_like(h_row_sum, dtype=float), where=h_row_sum != 0)
+        DH = H.T.multiply(h_row_inv.reshape(1, -1))
         DH = DH.T
         DHBH_T = np.dot(DH, BH_T)#dot() NumPy中用于计算两个数组的矩阵乘法（内积）的函数
 #tocoo()用于将稀疏矩阵转换为COO格式(用于表示稀疏矩阵的格式，它存储非零元素的坐标及对应的值)

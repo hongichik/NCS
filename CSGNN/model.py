@@ -327,9 +327,11 @@ def forward(model, i, data):
     return tar, scores, con_loss
 
 
-def train_test(model, train_data, test_data):
+def train_test(model, train_data, test_data, top_K=None):
     print('start training: ', datetime.datetime.now())
-    torch.autograd.set_detect_anomaly(True)
+    torch.autograd.set_detect_anomaly(False)
+    if top_K is None:
+        top_K = [20]
     total_loss = 0.0
     slices = train_data.generate_batch(model.batch_size)
     for i, j in zip(slices, np.arange(len(slices))):
@@ -340,11 +342,10 @@ def train_test(model, train_data, test_data):
         loss.backward()
         #        print(loss.item())
         model.optimizer.step()                                               
-        total_loss += loss
+        total_loss += loss.item()
         if j % int(len(slices) / 5 + 1) == 0:
             print('[%d/%d] Loss: %.4f' % (j, len(slices), loss.item()))
     print('\tLoss:\t%.3f' % total_loss)
-    top_K = [1, 3, 5, 10, 15, 20, 25, 30]
     metrics = {}
     for K in top_K:
         metrics['hit%d' % K] = []
@@ -353,17 +354,18 @@ def train_test(model, train_data, test_data):
 
     model.eval()
     slices = test_data.generate_batch(model.batch_size)
-    for i in slices:
-        tar, scores, con_loss = forward(model, i, test_data)
-        # tar, scores = forward(model, i, test_data)
-        scores = trans_to_cpu(scores).detach().numpy()
-        index = np.argsort(-scores, 1)
-        tar = trans_to_cpu(tar).detach().numpy()
-        for K in top_K:
-            for prediction, target in zip(index[:, :K], tar):
-                metrics['hit%d' % K].append(np.isin(target, prediction))
-                if len(np.where(prediction == target)[0]) == 0:
-                    metrics['mrr%d' % K].append(0)
-                else:
-                    metrics['mrr%d' % K].append(1 / (np.where(prediction == target)[0][0] + 1))
+    with torch.no_grad():
+        for i in slices:
+            tar, scores, con_loss = forward(model, i, test_data)
+            # tar, scores = forward(model, i, test_data)
+            scores = trans_to_cpu(scores).detach().numpy()
+            index = np.argsort(-scores, 1)
+            tar = trans_to_cpu(tar).detach().numpy()
+            for K in top_K:
+                for prediction, target in zip(index[:, :K], tar):
+                    metrics['hit%d' % K].append(np.isin(target, prediction))
+                    if len(np.where(prediction == target)[0]) == 0:
+                        metrics['mrr%d' % K].append(0)
+                    else:
+                        metrics['mrr%d' % K].append(1 / (np.where(prediction == target)[0][0] + 1))
     return metrics, total_loss

@@ -64,7 +64,7 @@ def main():
         max_cat_target = max(int(np.max(train_cate[1])), int(np.max(test_cate[1])))
     c_node = max(max_cat_session, max_cat_target)
     train_data = Data(train_data, train_cate, shuffle=True, n_node=n_node, c_node=c_node)
-    test_data = Data(test_data, test_cate, shuffle=True, n_node=n_node, c_node=c_node)
+    test_data = Data(test_data, test_cate, shuffle=False, n_node=n_node, c_node=c_node, build_adjacency=False)
     n_node, c_node = train_data.n_node, train_data.c_node
     # embedding_matrix = get_embedding(opt.dataset, n_node + c_node, opt.embSize)
     # 不使用预训练的结果

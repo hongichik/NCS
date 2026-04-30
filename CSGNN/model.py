@@ -171,7 +171,7 @@ class LineConv(Module):
             session_i = session_item[i] + session_item_cat[i]
             seq_h.append(torch.index_select(item_embedding, 0, session_i))
             # seq_h.append(torch.index_select(item_embedding, 0, session_item[i]))
-        seq_h1 = trans_to_cuda(torch.tensor([item.cpu().detach().numpy() for item in seq_h]))
+        seq_h1 = torch.stack(seq_h, dim=0)  # stay on GPU, avoid CPU numpy roundtrip
         # 注意力机制
         # session_emb_lgcn = torch.div(torch.sum(seq_h1, 1), (session_len * 2))
         session_emb_lgcn = torch.div(torch.sum(seq_h1, 1), session_len)

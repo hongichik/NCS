@@ -143,8 +143,8 @@ class Data():
         h_row_inv = np.divide(1.0, h_row_sum, out=np.zeros_like(h_row_sum, dtype=float), where=h_row_sum != 0)
         DH = H.T.multiply(h_row_inv.reshape(1, -1))
         DH = DH.T
-        DHBH_T = np.dot(DH, BH_T)#dot() NumPy中用于计算两个数组的矩阵乘法（内积）的函数
-#tocoo()用于将稀疏矩阵转换为COO格式(用于表示稀疏矩阵的格式，它存储非零元素的坐标及对应的值)
+        # Use sparse .dot() to avoid np.dot converting to dense (causes OOM on large datasets)
+        DHBH_T = DH.dot(BH_T)
         self.adjacency = DHBH_T.tocoo()
         self.n_node = n_node
         self.c_node = c_node

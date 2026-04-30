@@ -48,3 +48,9 @@ Optional GPU selection:
 python main.py --dataset nowplaying --gpu_id 0
 python main_sparse.py --dataset diginetica --gpu_id 0
 ```
+
+Save logs to a specific folder:
+```shell
+python main.py --dataset retailrocket --gpu_id 0 --log_dir logs
+python main.py --dataset retailrocket --gpu_id 0 --log_dir logs --log_file run_retailrocket.log
+```

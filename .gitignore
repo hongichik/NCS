@@ -54,3 +54,6 @@ preprocessed/
 diginetica/
 yoochoose*/
 sample/
+
+# Local large/raw datasets
+CSGNN/datasets/retailrocket/

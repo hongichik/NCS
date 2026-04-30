@@ -9,7 +9,7 @@ from model import *
 import os
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', default='nowplaying', help='dataset name: diginetica/Nowplaying/sample') #514修改默认值tmall到diginetica
+parser.add_argument('--dataset', default='nowplaying', help='dataset name: diginetica/nowplaying/retailrocket') #514修改默认值tmall到diginetica
 parser.add_argument('--epoch', type=int, default=10, help='number of epochs to train for')  #514修改默认值30到10
 parser.add_argument('--batchSize', type=int, default=64, help='input batch size')
 parser.add_argument('--embSize', type=int, default=8, help='embedding size')

@@ -20,12 +20,27 @@ pip install -r requirements.txt
 1. directory  `/datasets/id/` is the dataset of CSGNN model 
 2. directory `/datasets/pre_training/` is the embeddings of pre-training
 3. directories `/datasets/filter*` are the datasets of ablation experiments
+4. `datasets/retailrocket/` contains raw Retailrocket CSV files.
+
+### Prepare Retailrocket
+Generate CSGNN training files from raw Retailrocket CSV:
+
+```shell
+python datasets/retailrocket_interest.py
+```
+
+This command creates:
+- `datasets/retailrocket/id/train.txt`
+- `datasets/retailrocket/id/test.txt`
+- `datasets/retailrocket/id/category_train.txt`
+- `datasets/retailrocket/id/category_test.txt`
 
 
   
 ### Train and evaluate
 ```shell
 python main.py --dataset nowplaying --beta 0.005 --embSize 100 > result.output 
+python main.py --dataset retailrocket --beta 0.005 --embSize 100 > retailrocket.output
 ```
 
 Optional GPU selection:

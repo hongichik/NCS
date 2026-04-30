@@ -165,13 +165,20 @@ def split_train_test_one(item_sessions, cat_sessions, max_len=MAX_SESSION_LEN):
     )
 
 
-def build_id_map(train_sessions, test_sessions):
+def build_id_map(train_sessions, test_sessions, train_targets=None, test_targets=None):
     freq = defaultdict(int)
     for seq in train_sessions:
         for x in seq:
             freq[x] += 1
     for seq in test_sessions:
         for x in seq:
+            freq[x] += 1
+
+    if train_targets is not None:
+        for x in train_targets:
+            freq[x] += 1
+    if test_targets is not None:
+        for x in test_targets:
             freq[x] += 1
 
     ranked = sorted(freq.items(), key=lambda kv: kv[1], reverse=True)
@@ -212,8 +219,8 @@ def main():
     print("train samples:", len(train_i[0]), "test samples:", len(test_i[0]))
 
     print("[5/6] remap to dense ids")
-    item_map = build_id_map(train_i[0], test_i[0])
-    cat_map = build_id_map(train_c[0], test_c[0])
+    item_map = build_id_map(train_i[0], test_i[0], train_i[1], test_i[1])
+    cat_map = build_id_map(train_c[0], test_c[0], train_c[1], test_c[1])
 
     train_i = [remap_sequences(train_i[0], item_map), remap_targets(train_i[1], item_map)]
     test_i = [remap_sequences(test_i[0], item_map), remap_targets(test_i[1], item_map)]

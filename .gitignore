@@ -56,4 +56,4 @@ yoochoose*/
 sample/
 
 # Local large/raw datasets
-CSGNN/datasets/retailrocket/
+# CSGNN/datasets/retailrocket/

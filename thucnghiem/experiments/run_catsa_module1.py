@@ -60,6 +60,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--weight-decay", type=float, default=1e-4, help="L2 Regularization penalty")
+    parser.add_argument("--dropout", type=float, default=0.3, help="Dropout probability")
     parser.add_argument("--conv-type", choices=["sage", "gat"], default="sage")
     parser.add_argument(
         "--version",
@@ -405,9 +407,10 @@ def main() -> None:
         hidden_dim=args.hidden_dim,
         num_layers=args.num_layers,
         conv_type=args.conv_type,
+        dropout=args.dropout,
     ).to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     metric_k = max(args.metric_k, 1)
     logger.info("Metric config | Recall@%d and MRR@%d will be logged each epoch", metric_k, metric_k)
 

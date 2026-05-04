@@ -1,0 +1,4 @@
+torch>=2.2,<2.3
+torch-geometric>=2.5
+# torch 2.2.x được build với numpy 1.x; numpy 2.x gây lỗi import
+numpy>=1.24,<2

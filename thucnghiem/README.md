@@ -164,16 +164,24 @@ python -m experiments.run_catsa_module1 \
 	--log-dir outputs/logs
 ```
 
+Mặc định script sẽ log `Recall@20`, `MRR@20` theo epoch.
+Khi train với `--split train` từ artifact đã tiền xử lý, split đánh giá mặc định là `valid`.
+`--epochs` là số epoch tối đa; script sẽ dừng sớm nếu `MRR@K` không cải thiện trong 5 epoch liên tiếp (Early Stopping).
+
 Trong đó:
 
 - `--hidden-dim`: Kích thước embedding và hidden state.
 - `--num-layers`: Số lớp message passing trên heterogeneous graph.
 - `--batch-size`: Batch size cho `torch_geometric.loader.DataLoader`.
-- `--epochs`: Số epoch huấn luyện.
+- `--epochs`: Số epoch huấn luyện tối đa (có thể dừng sớm theo Early Stopping).
 - `--lr`: Learning rate cho Adam.
 - `--conv-type`: Chọn `sage` hoặc `gat`.
 - `--device`: Chọn `auto`, `cpu`, hoặc `cuda`. Mặc định `auto` sẽ ưu tiên CUDA nếu có.
 - `--version`: Chọn `1` hoặc `2`. `2` sẽ gán item thiếu danh mục vào `UNK_CAT=0`.
+- `--metric-k`: Giá trị K dùng để tính `Recall@K` và `MRR@K`. Mặc định `20`.
+- `--eval-split`: Chọn split đánh giá theo epoch: `auto`, `none`, `train`, `valid`, `test`. Mặc định `auto`.
+- `--early-stop-patience`: Patience cho Early Stopping. Mặc định `5`, đặt `0` để tắt.
+- `--early-stop-min-delta`: Ngưỡng cải thiện tối thiểu của `MRR@K` (đơn vị: điểm %). Mặc định `1e-4`.
 
 ## Gợi ý tổ chức đầu ra thí nghiệm
 

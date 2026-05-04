@@ -23,6 +23,9 @@ from preprocessing.session_graph_dataset import (
 )
 
 
+UNKNOWN_CATEGORY_ID = 0
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run CatSA Module 1 on toy data or RetailRocket.")
     parser.add_argument("--data-root", type=Path, default=None, help="Path to DATA/retailrocket")
@@ -57,12 +60,44 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--conv-type", choices=["sage", "gat"], default="sage")
     parser.add_argument(
+        "--version",
+        type=int,
+        choices=[1, 2],
+        default=1,
+        help="Pipeline version. version=2 maps uncategorized items to UNK_CAT=0.",
+    )
+    parser.add_argument(
         "--device",
         choices=["auto", "cpu", "cuda"],
         default="auto",
         help="Execution device. 'auto' prefers CUDA when available.",
     )
     return parser.parse_args()
+
+
+def apply_versioned_category_mapping(
+    session_sequences: list[list[int]],
+    item2leaf_dict: dict[int, int],
+    *,
+    version: int,
+    logger: logging.Logger,
+) -> dict[int, int]:
+    if version != 2:
+        return item2leaf_dict
+
+    all_item_ids = {int(item_id) for session in session_sequences for item_id in session}
+    augmented_item2leaf = dict(item2leaf_dict)
+    missing_item_ids = [item_id for item_id in all_item_ids if item_id not in augmented_item2leaf]
+
+    for item_id in missing_item_ids:
+        augmented_item2leaf[item_id] = UNKNOWN_CATEGORY_ID
+
+    logger.info(
+        "Version 2 enabled | UNK_CAT=%d | assigned_missing_items=%d",
+        UNKNOWN_CATEGORY_ID,
+        len(missing_item_ids),
+    )
+    return augmented_item2leaf
 
 
 def resolve_device(device_name: str) -> torch.device:
@@ -172,6 +207,13 @@ def main() -> None:
     else:
         session_sequences, item2leaf_dict, leaf2parent_dict = load_retailrocket_inputs(args.data_root)
         logger.info("Loaded RetailRocket data directly from raw CSV files: %s", args.data_root.resolve())
+
+    item2leaf_dict = apply_versioned_category_mapping(
+        session_sequences,
+        item2leaf_dict,
+        version=args.version,
+        logger=logger,
+    )
 
     # Fit taxonomy từ FULL sessions trước để vocabulary chứa tất cả item
     # (bao gồm cả item chỉ xuất hiện ở cuối session làm target, chưa từng xuất hiện trong prefix)

@@ -45,6 +45,9 @@ python -m experiments.run_catsa_module1
 
 Script sẽ tự dùng CUDA nếu môi trường có GPU khả dụng. Nếu muốn ép thiết bị chạy, dùng `--device cpu` hoặc `--device cuda`.
 
+Mặc định script chạy `--version 1` (giữ nguyên hành vi cũ).
+Nếu chạy `--version 2`, các item không có danh mục sẽ được gán vào danh mục ảo `UNK_CAT=0` và được nối cạnh membership `(item, belongs_to, leaf_cat)` tới node danh mục ảo này.
+
 ## Bước 1: Tiền xử lý dữ liệu RetailRocket
 
 Khi bạn thêm dữ liệu vào thư mục `DATA/retailrocket`, hãy chạy tiền xử lý trước:
@@ -145,6 +148,22 @@ python -m experiments.run_catsa_module1 \
 	--log-dir outputs/logs
 ```
 
+Chạy phiên bản 2 với danh mục ảo:
+
+```bash
+python -m experiments.run_catsa_module1 \
+	--processed-path outputs/processed/retailrocket_module1.json \
+	--hidden-dim 128 \
+	--num-layers 2 \
+	--batch-size 32 \
+	--epochs 10 \
+	--lr 1e-3 \
+	--conv-type sage \
+	--device auto \
+	--version 2 \
+	--log-dir outputs/logs
+```
+
 Trong đó:
 
 - `--hidden-dim`: Kích thước embedding và hidden state.
@@ -154,6 +173,7 @@ Trong đó:
 - `--lr`: Learning rate cho Adam.
 - `--conv-type`: Chọn `sage` hoặc `gat`.
 - `--device`: Chọn `auto`, `cpu`, hoặc `cuda`. Mặc định `auto` sẽ ưu tiên CUDA nếu có.
+- `--version`: Chọn `1` hoặc `2`. `2` sẽ gán item thiếu danh mục vào `UNK_CAT=0`.
 
 ## Gợi ý tổ chức đầu ra thí nghiệm
 

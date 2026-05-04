@@ -97,6 +97,12 @@ def parse_args() -> argparse.Namespace:
         default=1e-4,
         help="Minimum MRR@K improvement (in percentage points) required to reset early stopping.",
     )
+    parser.add_argument(
+        "--log-every-steps",
+        type=int,
+        default=500,
+        help="Log training progress every N mini-batches within each epoch.",
+    )
     return parser.parse_args()
 
 
@@ -430,7 +436,10 @@ def main() -> None:
         model.train()
         epoch_start = time.time()
         total_loss = 0.0
-        for batch in train_loader:
+        num_batches = max(len(train_loader), 1)
+        log_every_steps = max(args.log_every_steps, 1)
+
+        for batch_idx, batch in enumerate(train_loader, start=1):
             batch = batch.to(device, non_blocking=device.type == "cuda")
             optimizer.zero_grad()
             logits = model(batch)
@@ -439,6 +448,24 @@ def main() -> None:
             loss.backward()
             optimizer.step()
             total_loss += float(loss.item())
+
+            if batch_idx % log_every_steps == 0 or batch_idx == num_batches:
+                elapsed = max(time.time() - epoch_start, 1e-8)
+                progress_pct = 100.0 * batch_idx / num_batches
+                steps_per_sec = batch_idx / elapsed
+                remaining_steps = max(num_batches - batch_idx, 0)
+                eta_seconds = remaining_steps / max(steps_per_sec, 1e-8)
+                running_loss = total_loss / batch_idx
+                logger.info(
+                    "epoch=%d progress=%d/%d (%.2f%%) running_loss=%.4f steps_per_sec=%.2f eta_sec=%.1f",
+                    epoch + 1,
+                    batch_idx,
+                    num_batches,
+                    progress_pct,
+                    running_loss,
+                    steps_per_sec,
+                    eta_seconds,
+                )
 
         mean_loss = total_loss / max(len(train_loader), 1)
         epoch_seconds = time.time() - epoch_start

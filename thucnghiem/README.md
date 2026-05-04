@@ -182,6 +182,7 @@ Trong đó:
 - `--eval-split`: Chọn split đánh giá theo epoch: `auto`, `none`, `train`, `valid`, `test`. Mặc định `auto`.
 - `--early-stop-patience`: Patience cho Early Stopping. Mặc định `5`, đặt `0` để tắt.
 - `--early-stop-min-delta`: Ngưỡng cải thiện tối thiểu của `MRR@K` (đơn vị: điểm %). Mặc định `1e-4`.
+- `--log-every-steps`: Tần suất log tiến độ trong mỗi epoch (đơn vị mini-batch). Mặc định `500`.
 
 ## Gợi ý tổ chức đầu ra thí nghiệm
 

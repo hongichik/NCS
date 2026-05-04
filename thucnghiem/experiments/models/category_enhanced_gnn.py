@@ -105,11 +105,21 @@ class CategoryEnhancedGNN(nn.Module):
                 x_dict[node_type] = norm_dict[node_type](prev_states + updated_states)
 
         item_hidden = x_dict["item"]
+
+        last_index = data["item"].last_index
+        sequence_index = data["item"].sequence_index
+
+        if hasattr(data["item"], "ptr") and data["item"].ptr is not None:
+            ptr = data["item"].ptr[:-1]
+            last_index = last_index + ptr
+            seq_ptr = torch.repeat_interleave(ptr, data["item"].sequence_len)
+            sequence_index = sequence_index + seq_ptr
+
         session_repr = self.readout(
             item_hidden=item_hidden,
-            sequence_index=data["item"].sequence_index,
+            sequence_index=sequence_index,
             sequence_len=data["item"].sequence_len,
-            last_index=data["item"].last_index,
+            last_index=last_index,
         )
         logits = session_repr @ self.item_embedding.weight.t()
         return logits

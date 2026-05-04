@@ -43,6 +43,8 @@ Lưu ý: `torch_geometric` đôi khi cần cài đúng phiên bản theo hệ đ
 python -m experiments.run_catsa_module1
 ```
 
+Script sẽ tự dùng CUDA nếu môi trường có GPU khả dụng. Nếu muốn ép thiết bị chạy, dùng `--device cpu` hoặc `--device cuda`.
+
 ## Bước 1: Tiền xử lý dữ liệu RetailRocket
 
 Khi bạn thêm dữ liệu vào thư mục `DATA/retailrocket`, hãy chạy tiền xử lý trước:
@@ -139,6 +141,7 @@ python -m experiments.run_catsa_module1 \
 	--epochs 10 \
 	--lr 1e-3 \
 	--conv-type sage \
+	--device auto \
 	--log-dir outputs/logs
 ```
 
@@ -150,6 +153,7 @@ Trong đó:
 - `--epochs`: Số epoch huấn luyện.
 - `--lr`: Learning rate cho Adam.
 - `--conv-type`: Chọn `sage` hoặc `gat`.
+- `--device`: Chọn `auto`, `cpu`, hoặc `cuda`. Mặc định `auto` sẽ ưu tiên CUDA nếu có.
 
 ## Gợi ý tổ chức đầu ra thí nghiệm
 

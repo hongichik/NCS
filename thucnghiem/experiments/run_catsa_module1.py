@@ -56,7 +56,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--conv-type", choices=["sage", "gat"], default="sage")
+    parser.add_argument(
+        "--device",
+        choices=["auto", "cpu", "cuda"],
+        default="auto",
+        help="Execution device. 'auto' prefers CUDA when available.",
+    )
     return parser.parse_args()
+
+
+def resolve_device(device_name: str) -> torch.device:
+    if device_name == "cpu":
+        return torch.device("cpu")
+    if device_name == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError("--device cuda was requested but CUDA is not available")
+        return torch.device("cuda")
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    return torch.device("cpu")
 
 
 def configure_logging(log_dir: Optional[Path], log_file_name: str) -> logging.Logger:
@@ -135,6 +153,12 @@ def load_retailrocket_inputs(data_root: Path) -> tuple[list[list[int]], dict[int
 def main() -> None:
     args = parse_args()
     logger = configure_logging(args.log_dir, args.log_file_name)
+    device = resolve_device(args.device)
+
+    if device.type == "cuda":
+        logger.info("Using device: %s (%s)", device, torch.cuda.get_device_name(device))
+    else:
+        logger.info("Using device: %s", device)
 
     if args.processed_path is not None:
         session_sequences, item2leaf_dict, leaf2parent_dict = load_preprocessed_artifacts(
@@ -177,7 +201,12 @@ def main() -> None:
         targets=valid_targets,
         taxonomy=taxonomy,
     )
-    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+    loader = DataLoader(
+        dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        pin_memory=device.type == "cuda",
+    )
     logger.info(
         "Dataset prepared | num_graphs=%d | num_items=%d | num_leaf_cats=%d | num_parent_cats=%d",
         len(dataset),
@@ -193,7 +222,7 @@ def main() -> None:
         hidden_dim=args.hidden_dim,
         num_layers=args.num_layers,
         conv_type=args.conv_type,
-    )
+    ).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     model.train()
@@ -201,6 +230,7 @@ def main() -> None:
     for epoch in range(args.epochs):
         total_loss = 0.0
         for batch in loader:
+            batch = batch.to(device, non_blocking=device.type == "cuda")
             optimizer.zero_grad()
             logits = model(batch)
             target = batch.y.view(-1)
@@ -213,7 +243,7 @@ def main() -> None:
         logger.info("epoch=%d mean_loss=%.4f num_graphs=%d", epoch + 1, mean_loss, len(dataset))
 
     model.eval()
-    sample_batch = next(iter(loader))
+    sample_batch = next(iter(loader)).to(device, non_blocking=device.type == "cuda")
     with torch.no_grad():
         sample_logits = model(sample_batch)
         topk_scores, topk_items = torch.topk(sample_logits, k=min(5, sample_logits.size(-1)), dim=-1)

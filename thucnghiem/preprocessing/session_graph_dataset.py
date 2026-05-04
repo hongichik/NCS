@@ -157,6 +157,8 @@ class CategorySessionGraphDataset(Dataset[HeteroData]):
 
         sequential_src = sequence_local_indices[:-1]
         sequential_dst = sequence_local_indices[1:]
+        reverse_sequential_src = sequence_local_indices[1:]
+        reverse_sequential_dst = sequence_local_indices[:-1]
 
         leaf_global_ids: list[int] = []
         leaf_local_index: dict[int, int] = {}
@@ -199,6 +201,10 @@ class CategorySessionGraphDataset(Dataset[HeteroData]):
         data["parent_cat"].num_nodes = len(parent_global_ids)
 
         data[("item", "sequential", "item")].edge_index = _to_edge_index(sequential_src, sequential_dst)
+        data[("item", "rev_sequential", "item")].edge_index = _to_edge_index(
+            reverse_sequential_src,
+            reverse_sequential_dst,
+        )
 
         item_leaf_src = [src for src, _ in item_to_leaf_edges]
         item_leaf_dst = [dst for _, dst in item_to_leaf_edges]

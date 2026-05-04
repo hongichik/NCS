@@ -16,6 +16,7 @@ from preprocessing.retailrocket_preprocess import (
     load_preprocessed_artifacts,
     load_item_to_leaf_mapping,
     load_leaf_to_parent_mapping,
+    resolve_retailrocket_file_paths,
 )
 from preprocessing.session_graph_dataset import (
     CategorySessionGraphDataset,
@@ -198,12 +199,7 @@ def build_toy_example() -> tuple[list[list[int]], dict[int, int], dict[int, int]
 
 
 def load_retailrocket_inputs(data_root: Path) -> tuple[list[list[int]], dict[int, int], dict[int, int]]:
-    events_path = data_root / "events.csv"
-    category_tree_path = data_root / "category_tree.csv"
-    property_paths = [
-        data_root / "item_properties_part1.csv",
-        data_root / "item_properties_part2.csv",
-    ]
+    events_path, category_tree_path, property_paths, _ = resolve_retailrocket_file_paths(data_root)
 
     missing_paths = [path for path in [events_path, category_tree_path, *property_paths] if not path.exists()]
     if missing_paths:

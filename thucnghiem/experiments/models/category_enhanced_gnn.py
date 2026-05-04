@@ -43,6 +43,18 @@ class CategoryEnhancedGNN(nn.Module):
         self.convs = nn.ModuleList(
             [self._build_hetero_layer(hidden_dim, conv_type, gat_heads) for _ in range(num_layers)]
         )
+        self.norms = nn.ModuleList(
+            [
+                nn.ModuleDict(
+                    {
+                        "item": nn.LayerNorm(hidden_dim),
+                        "leaf_cat": nn.LayerNorm(hidden_dim),
+                        "parent_cat": nn.LayerNorm(hidden_dim),
+                    }
+                )
+                for _ in range(num_layers)
+            ]
+        )
 
         self.attn_query = nn.Linear(hidden_dim, hidden_dim, bias=True)
         self.attn_key = nn.Linear(hidden_dim, hidden_dim, bias=False)
@@ -57,6 +69,9 @@ class CategoryEnhancedGNN(nn.Module):
         self.parent_embedding.reset_parameters()
         for conv in self.convs:
             conv.reset_parameters()
+        for norm_dict in self.norms:
+            for norm in norm_dict.values():
+                norm.reset_parameters()
         self.attn_query.reset_parameters()
         self.attn_key.reset_parameters()
         self.attn_score.reset_parameters()
@@ -77,12 +92,17 @@ class CategoryEnhancedGNN(nn.Module):
             "parent_cat": self.parent_embedding(data["parent_cat"].node_id),
         }
 
-        for conv in self.convs:
-            x_dict = conv(x_dict, data.edge_index_dict)
-            x_dict = {
-                node_type: F.dropout(F.relu(node_states), p=self.dropout, training=self.training)
-                for node_type, node_states in x_dict.items()
-            }
+        for conv, norm_dict in zip(self.convs, self.norms):
+            prev_x_dict = x_dict
+            conv_x_dict = conv(prev_x_dict, data.edge_index_dict)
+            x_dict = {}
+            for node_type, prev_states in prev_x_dict.items():
+                updated_states = conv_x_dict.get(node_type)
+                if updated_states is None:
+                    x_dict[node_type] = norm_dict[node_type](prev_states)
+                    continue
+                updated_states = F.dropout(F.relu(updated_states), p=self.dropout, training=self.training)
+                x_dict[node_type] = norm_dict[node_type](prev_states + updated_states)
 
         item_hidden = x_dict["item"]
         session_repr = self.readout(
@@ -169,6 +189,7 @@ class CategoryEnhancedGNN(nn.Module):
 
         relation_convs = {
             ("item", "sequential", "item"): build_conv(),
+            ("item", "rev_sequential", "item"): build_conv(),
             ("item", "belongs_to", "leaf_cat"): build_conv(),
             ("leaf_cat", "contains", "item"): build_conv(),
             ("leaf_cat", "child_of", "parent_cat"): build_conv(),

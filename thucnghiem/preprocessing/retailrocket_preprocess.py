@@ -16,6 +16,45 @@ class SessionRecord:
     end_timestamp: int
 
 
+def resolve_retailrocket_file_paths(
+    data_root: str | Path,
+) -> tuple[Path, Path, list[Path], Path]:
+    """
+    Resolve RetailRocket file locations for either of these layouts:
+    - DATA/events.csv, DATA/category_tree.csv, ...
+    - DATA/retailrocket/events.csv, DATA/retailrocket/category_tree.csv, ...
+    """
+    requested_root = Path(data_root)
+    candidate_roots = [requested_root]
+    if requested_root.name == "retailrocket":
+        candidate_roots.append(requested_root.parent)
+    else:
+        candidate_roots.append(requested_root / "retailrocket")
+
+    seen_roots: list[Path] = []
+    for candidate_root in candidate_roots:
+        if candidate_root in seen_roots:
+            continue
+        seen_roots.append(candidate_root)
+
+        events_path = candidate_root / "events.csv"
+        category_tree_path = candidate_root / "category_tree.csv"
+        property_paths = [
+            candidate_root / "item_properties_part1.csv",
+            candidate_root / "item_properties_part2.csv",
+        ]
+        if events_path.exists() and category_tree_path.exists() and all(path.exists() for path in property_paths):
+            return events_path, category_tree_path, property_paths, candidate_root
+
+    events_path = requested_root / "events.csv"
+    category_tree_path = requested_root / "category_tree.csv"
+    property_paths = [
+        requested_root / "item_properties_part1.csv",
+        requested_root / "item_properties_part2.csv",
+    ]
+    return events_path, category_tree_path, property_paths, requested_root
+
+
 def load_leaf_to_parent_mapping(category_tree_path: str | Path) -> dict[int, int]:
     """Load leaf -> parent edges from RetailRocket category_tree.csv."""
     leaf_to_parent: dict[int, int] = {}
@@ -322,18 +361,15 @@ def main() -> None:
     args = parse_args()
     logger = configure_logging(args.log_dir, args.log_file_name)
 
-    data_root = args.data_root
-    events_path = data_root / "events.csv"
-    category_tree_path = data_root / "category_tree.csv"
-    property_paths = [
-        data_root / "item_properties_part1.csv",
-        data_root / "item_properties_part2.csv",
-    ]
+    events_path, category_tree_path, property_paths, resolved_root = resolve_retailrocket_file_paths(args.data_root)
 
     missing_paths = [path for path in [events_path, category_tree_path, *property_paths] if not path.exists()]
     if missing_paths:
         missing = ", ".join(str(path) for path in missing_paths)
         raise FileNotFoundError(f"Missing RetailRocket files: {missing}")
+
+    if resolved_root != args.data_root:
+        logger.info("Resolved data root from %s to %s", args.data_root, resolved_root)
 
     session_records = build_session_records_from_events(
         events_path,
@@ -371,6 +407,7 @@ def main() -> None:
     )
 
     logger.info("Saved preprocessed artifact to %s", output_path.resolve())
+    logger.info("data_root=%s", resolved_root.resolve())
     logger.info("allowed_events=%s", ",".join(args.allowed_events))
     logger.info("min_item_clicks=%d  (giữ item có click >= %d, hiếm là < %d)", args.min_item_clicks, args.min_item_clicks, args.min_item_clicks)
     logger.info("num_sessions=%d", len(session_sequences))

@@ -23,9 +23,10 @@ Không nên để script huấn luyện luôn gánh cả bước tiền xử lý
 - Xây dựng đồ thị không đồng nhất cho mỗi session với 3 loại node: `item`, `leaf_cat`, `parent_cat`.
 - Tạo các cạnh:
 	- `(item, sequential, item)`
+	- `(item, rev_sequential, item)`
 	- `(item, belongs_to, leaf_cat)` và `(leaf_cat, contains, item)`
 	- `(leaf_cat, child_of, parent_cat)` và `(parent_cat, parent_of, leaf_cat)`
-- Backbone `CategoryEnhancedGNN` sử dụng `HeteroConv` với `SAGEConv` hoặc `GATConv`.
+- Backbone `CategoryEnhancedGNN` sử dụng `HeteroConv` với `SAGEConv` hoặc `GATConv`, kèm residual connection và `LayerNorm` giữa các lớp.
 - Readout theo kiểu SR-GNN với soft-attention để tạo biểu diễn session.
 - Dự đoán item kế tiếp bằng phép nhân với ma trận embedding toàn bộ item.
 
@@ -50,21 +51,26 @@ Nếu chạy `--version 2`, các item không có danh mục sẽ được gán v
 
 ## Bước 1: Tiền xử lý dữ liệu RetailRocket
 
-Khi bạn thêm dữ liệu vào thư mục `DATA/retailrocket`, hãy chạy tiền xử lý trước:
+Khi bạn thêm dữ liệu vào thư mục `DATA`, hãy chạy tiền xử lý trước:
 
 ```bash
 python -m preprocessing.retailrocket_preprocess \
-	--data-root DATA/retailrocket \
+	--data-root DATA \
 	--output-path outputs/processed/retailrocket_module1.json \
 	--allowed-events view \
 	--min-item-clicks 5
 ```
 
+Script hiện hỗ trợ cả hai cách bố trí file:
+
+- `DATA/events.csv`, `DATA/category_tree.csv`, ...
+- `DATA/retailrocket/events.csv`, `DATA/retailrocket/category_tree.csv`, ...
+
 Nếu muốn lưu log ra thư mục riêng từ lệnh bên ngoài:
 
 ```bash
 python -m preprocessing.retailrocket_preprocess \
-	--data-root DATA/retailrocket \
+	--data-root DATA \
 	--output-path outputs/processed/retailrocket_module1.json \
 	--allowed-events view \
 	--min-item-clicks 5 \
@@ -102,7 +108,7 @@ python -m experiments.run_catsa_module1 \
 Bạn vẫn có thể chạy trực tiếp từ dữ liệu thô nếu cần debug nhanh:
 
 ```bash
-python -m experiments.run_catsa_module1 --data-root DATA/retailrocket
+python -m experiments.run_catsa_module1 --data-root DATA
 ```
 
 Các file được script sử dụng gồm:

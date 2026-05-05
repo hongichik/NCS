@@ -159,7 +159,10 @@ class CategorySessionGraphDataset(Dataset[HeteroData]):
         if item_to_replace in self.dict_same_leaf and self.dict_same_leaf[item_to_replace]:
             new_item = random.choice(self.dict_same_leaf[item_to_replace])
             view1_session[replace_idx] = new_item
-        view1_graph = self._build_graph(view1_session, target)
+        try:
+            view1_graph = self._build_graph(view1_session, target)
+        except ValueError:
+            view1_graph = base_graph
 
         # View 2: Sibling-Leaf Substitution
         view2_session = list(raw_session)
@@ -168,7 +171,10 @@ class CategorySessionGraphDataset(Dataset[HeteroData]):
         if item_to_replace2 in self.dict_sibling and self.dict_sibling[item_to_replace2]:
             new_item2 = random.choice(self.dict_sibling[item_to_replace2])
             view2_session[replace_idx2] = new_item2
-        view2_graph = self._build_graph(view2_session, target)
+        try:
+            view2_graph = self._build_graph(view2_session, target)
+        except ValueError:
+            view2_graph = base_graph
 
         return base_graph, view1_graph, view2_graph
 

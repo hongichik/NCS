@@ -95,6 +95,12 @@ def parse_args() -> argparse.Namespace:
         help="Early stopping patience in epochs. Training stops after this many non-improving epochs. Set 0 to disable.",
     )
     parser.add_argument(
+        "--monitor-metric",
+        choices=["mrr", "recall"],
+        default="mrr",
+        help="Metric to monitor for early stopping (mrr or recall).",
+    )
+    parser.add_argument(
         "--early-stop-min-delta",
         type=float,
         default=1e-4,
@@ -417,13 +423,14 @@ def main() -> None:
     early_stop_patience = max(args.early_stop_patience, 0)
     early_stop_min_delta = max(float(args.early_stop_min_delta), 0.0)
     monitor_split = select_monitor_split(eval_split)
-    best_monitor_mrr = float("-inf")
+    best_monitor_metric = float("-inf")
     best_epoch = 0
     no_improve_epochs = 0
     if early_stop_patience > 0:
         logger.info(
-            "Early stopping enabled | monitor=%s_mrr@%d | patience=%d | min_delta=%.6f",
+            "Early stopping enabled | monitor=%s_%s@%d | patience=%d | min_delta=%.6f",
             monitor_split,
+            args.monitor_metric,
             metric_k,
             early_stop_patience,
             early_stop_min_delta,
@@ -491,7 +498,7 @@ def main() -> None:
             epoch_seconds,
         ]
 
-        current_monitor_mrr = train_mrr
+        current_monitor_metric = train_mrr if args.monitor_metric == "mrr" else train_recall
 
         if eval_loader is not None and eval_split is not None:
             eval_recall, eval_mrr, eval_metric_samples = evaluate_topk_metrics(
@@ -514,23 +521,24 @@ def main() -> None:
                 ]
             )
             if monitor_split == eval_split:
-                current_monitor_mrr = eval_mrr
+                current_monitor_metric = eval_mrr if args.monitor_metric == "mrr" else eval_recall
 
-        improved = current_monitor_mrr > (best_monitor_mrr + early_stop_min_delta)
+        improved = current_monitor_metric > (best_monitor_metric + early_stop_min_delta)
         if improved:
-            best_monitor_mrr = current_monitor_mrr
+            best_monitor_metric = current_monitor_metric
             best_epoch = epoch + 1
             no_improve_epochs = 0
         else:
             no_improve_epochs += 1
 
-        log_message += " monitor=%s_mrr@%d=%.2f%% best=%.2f%% no_improve=%d"
+        log_message += " monitor=%s_%s@%d=%.2f%% best=%.2f%% no_improve=%d"
         log_args.extend(
             [
                 monitor_split,
+                args.monitor_metric,
                 metric_k,
-                current_monitor_mrr,
-                best_monitor_mrr,
+                current_monitor_metric,
+                best_monitor_metric,
                 no_improve_epochs,
             ]
         )
@@ -539,12 +547,13 @@ def main() -> None:
 
         if early_stop_patience > 0 and no_improve_epochs >= early_stop_patience:
             logger.info(
-                "Early stopping triggered at epoch=%d | best_epoch=%d | best_%s_mrr@%d=%.2f%%",
+                "Early stopping triggered at epoch=%d | best_epoch=%d | best_%s_%s@%d=%.2f%%",
                 epoch + 1,
                 best_epoch,
                 monitor_split,
+                args.monitor_metric,
                 metric_k,
-                best_monitor_mrr,
+                best_monitor_metric,
             )
             break
 

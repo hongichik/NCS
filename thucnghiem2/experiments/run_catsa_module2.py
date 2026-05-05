@@ -53,7 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--log-file-name",
         type=str,
-        default="catsa_module1.log",
+        default="catsa_module2.log",
         help="Log file name created inside --log-dir.",
     )
     parser.add_argument("--hidden-dim", type=int, default=128)
@@ -287,6 +287,8 @@ def evaluate_topk_metrics(
 
     with torch.no_grad():
         for batch in loader:
+            if isinstance(batch, (list, tuple)) and len(batch) == 3:
+                batch = batch[0]
             batch = batch.to(device, non_blocking=device.type == "cuda")
             logits = model(batch)
             target = batch.y.view(-1)
@@ -355,6 +357,16 @@ def main() -> None:
         logger=logger,
     )
 
+    # Load augmentation dicts if provided
+    dict_same_leaf = None
+    dict_sibling = None
+    if args.augmentation_path is not None and args.augmentation_path.exists():
+        with open(args.augmentation_path, "r", encoding="utf-8") as f:
+            aug_data = json.load(f)
+            dict_same_leaf = {int(k): v for k, v in aug_data.get("dict_same_leaf", {}).items()}
+            dict_sibling = {int(k): v for k, v in aug_data.get("dict_sibling", {}).items()}
+        logger.info("Loaded augmentation dictionaries from %s", args.augmentation_path)
+
     # Fit taxonomy từ FULL sessions trước để vocabulary chứa tất cả item
     # (bao gồm cả item chỉ xuất hiện ở cuối session làm target, chưa từng xuất hiện trong prefix)
     taxonomy = fit_taxonomy_encoders(sequences_for_mapping, item2leaf_dict, leaf2parent_dict)
@@ -366,6 +378,8 @@ def main() -> None:
         leaf2parent_dict=leaf2parent_dict,
         logger=logger,
         split_name=args.split,
+        dict_same_leaf=dict_same_leaf,
+        dict_sibling=dict_sibling,
     )
     train_loader = DataLoader(
         train_dataset,
@@ -452,11 +466,40 @@ def main() -> None:
         log_every_steps = max(args.log_every_steps, 1)
 
         for batch_idx, batch in enumerate(train_loader, start=1):
-            batch = batch.to(device, non_blocking=device.type == "cuda")
-            optimizer.zero_grad()
-            logits = model(batch)
-            target = batch.y.view(-1)
-            loss = F.cross_entropy(logits, target)
+            if isinstance(batch, (list, tuple)) and len(batch) == 3:
+                base_batch, view1_batch, view2_batch = batch
+                base_batch = base_batch.to(device, non_blocking=device.type == "cuda")
+                view1_batch = view1_batch.to(device, non_blocking=device.type == "cuda")
+                view2_batch = view2_batch.to(device, non_blocking=device.type == "cuda")
+                
+                optimizer.zero_grad()
+                logits_S, embed_S = model(base_batch, return_embedding=True)
+                _, embed_V1 = model(view1_batch, return_embedding=True)
+                _, embed_V2 = model(view2_batch, return_embedding=True)
+                
+                target = base_batch.y.view(-1)
+                loss_rec = F.cross_entropy(logits_S, target)
+                
+                embed_S_norm = F.normalize(embed_S, dim=-1)
+                embed_V1_norm = F.normalize(embed_V1, dim=-1)
+                embed_V2_norm = F.normalize(embed_V2, dim=-1)
+                
+                sim_v1 = torch.matmul(embed_S_norm, embed_V1_norm.t()) / args.tau
+                sim_v2 = torch.matmul(embed_S_norm, embed_V2_norm.t()) / args.tau
+                
+                labels = torch.arange(sim_v1.size(0), device=device)
+                loss_cl1 = F.cross_entropy(sim_v1, labels)
+                loss_cl2 = F.cross_entropy(sim_v2, labels)
+                
+                loss_cl = (loss_cl1 + loss_cl2) / 2.0
+                loss = loss_rec + args.lambda_cl * loss_cl
+            else:
+                batch = batch.to(device, non_blocking=device.type == "cuda")
+                optimizer.zero_grad()
+                logits = model(batch)
+                target = batch.y.view(-1)
+                loss = F.cross_entropy(logits, target)
+
             loss.backward()
             optimizer.step()
             total_loss += float(loss.item())
@@ -562,7 +605,10 @@ def main() -> None:
             break
 
     model.eval()
-    sample_batch = next(iter(train_loader)).to(device, non_blocking=device.type == "cuda")
+    sample_batch = next(iter(train_loader))
+    if isinstance(sample_batch, (list, tuple)) and len(sample_batch) == 3:
+        sample_batch = sample_batch[0]
+    sample_batch = sample_batch.to(device, non_blocking=device.type == "cuda")
     with torch.no_grad():
         sample_logits = model(sample_batch)
         topk_scores, topk_items = torch.topk(sample_logits, k=min(5, sample_logits.size(-1)), dim=-1)

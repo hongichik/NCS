@@ -61,6 +61,12 @@ class CategoryEnhancedGNN(nn.Module):
         self.attn_score = nn.Linear(hidden_dim, 1, bias=False)
         self.session_proj = nn.Linear(hidden_dim * 2, hidden_dim)
 
+        self.cl_projection = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.PReLU(),
+            nn.Linear(hidden_dim, hidden_dim)
+        )
+
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -76,6 +82,9 @@ class CategoryEnhancedGNN(nn.Module):
         self.attn_key.reset_parameters()
         self.attn_score.reset_parameters()
         self.session_proj.reset_parameters()
+        for layer in self.cl_projection:
+            if isinstance(layer, nn.Linear):
+                layer.reset_parameters()
 
     def forward(self, data: HeteroData, return_embedding: bool = False):
         """
@@ -125,7 +134,8 @@ class CategoryEnhancedGNN(nn.Module):
         logits = session_repr @ self.item_embedding.weight.t()
         
         if return_embedding:
-            return logits, session_repr
+            cl_repr = self.cl_projection(session_repr)
+            return logits, cl_repr
             
         return logits
 

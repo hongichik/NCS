@@ -122,3 +122,4 @@ class Data():
 
 
         return self.targets[index]-1, session_len,items, reversed_sess_item, mask
+

@@ -1,0 +1,6 @@
+(base) hongnguyen@dsserver:~/NCS/COTREC$ cd /home/hongnguyen/NCS/COTREC
+mkdir -p logs
+nohup python main.py --dataset retailrocket --epoch 30 > logs/retailrocket.nohup.log 2>&1 &
+echo $!
+[1] 442588
+442588

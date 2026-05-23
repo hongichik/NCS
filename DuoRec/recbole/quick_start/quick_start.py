@@ -40,6 +40,11 @@ def run_recbole(model=None, dataset=None, config_file_list=None, config_dict=Non
     
     logger.info(config)
 
+    if config['saved'] is not None:
+        saved = config['saved']
+    run_post_analysis = True if config['run_post_analysis'] is None else bool(config['run_post_analysis'])
+    run_test = True if config['run_test'] is None else bool(config['run_test'])
+
     # dataset filtering
     dataset = create_dataset(config)
     logger.info(dataset)
@@ -59,58 +64,74 @@ def run_recbole(model=None, dataset=None, config_file_list=None, config_dict=Non
         train_data, valid_data, saved=saved, show_progress=config['show_progress']
     )
 
-    import numpy as np
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-    from sklearn.decomposition import TruncatedSVD
+    if run_post_analysis:
+        import numpy as np
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        from sklearn.decomposition import TruncatedSVD
 
-    embedding_matrix = model.item_embedding.weight[1:].cpu().detach().numpy()
-    svd = TruncatedSVD(n_components=2)
-    svd.fit(embedding_matrix)
-    comp_tr = np.transpose(svd.components_)
-    proj = np.dot(embedding_matrix, comp_tr)
-    
-    cnt = {}
-    for i in dataset['item_id']:
-        if i.item() in cnt:
-            cnt[i.item()] += 1
-        else:
-            cnt[i.item()] = 1
-    
-    freq = np.zeros(embedding_matrix.shape[0])
-    for i in cnt:
-        freq[i-1] = cnt[i]
-    
-    # freq /= freq.max()
+        embedding_matrix = model.item_embedding.weight[1:].cpu().detach().numpy()
+        svd = TruncatedSVD(n_components=2)
+        svd.fit(embedding_matrix)
+        comp_tr = np.transpose(svd.components_)
+        proj = np.dot(embedding_matrix, comp_tr)
 
-    sns.set(style='darkgrid')
-    sns.set_context("notebook", font_scale=1.8, rc={"lines.linewidth": 3, 'lines.markersize': 20})
-    plt.figure(figsize=(6, 4.5))
-    plt.scatter(proj[:, 0], proj[:, 1], s=1, c=freq, cmap='viridis_r')
-    plt.colorbar()
-    plt.xlim(-2, 2)
-    plt.ylim(-2, 2)
-    # plt.axis('square')
-    # plt.show()
-    plt.savefig(log_dir + '/' + config['model'] + '-' + config['dataset'] + '.pdf', format='pdf', transparent=False, bbox_inches='tight')
-    
-    from scipy.linalg import svdvals
-    svs = svdvals(embedding_matrix)
-    svs /= svs.max()
-    np.save(log_dir + '/sv.npy', svs)
+        cnt = {}
+        for i in dataset['item_id']:
+            if i.item() in cnt:
+                cnt[i.item()] += 1
+            else:
+                cnt[i.item()] = 1
 
-    sns.set(style='darkgrid')
-    sns.set_context("notebook", font_scale=1.8, rc={"lines.linewidth": 3, 'lines.markersize': 20})
-    plt.figure(figsize=(6, 4.5))
-    plt.plot(svs)
-    # plt.show()
-    plt.savefig(log_dir + '/svs.pdf', format='pdf', transparent=False, bbox_inches='tight')
+        freq = np.zeros(embedding_matrix.shape[0])
+        for i in cnt:
+            freq[i - 1] = cnt[i]
+
+        sns.set(style='darkgrid')
+        sns.set_context("notebook", font_scale=1.8, rc={"lines.linewidth": 3, 'lines.markersize': 20})
+        plt.figure(figsize=(6, 4.5))
+        plt.scatter(proj[:, 0], proj[:, 1], s=1, c=freq, cmap='viridis_r')
+        plt.colorbar()
+        plt.xlim(-2, 2)
+        plt.ylim(-2, 2)
+        plt.savefig(log_dir + '/' + config['model'] + '-' + config['dataset'] + '.pdf', format='pdf', transparent=False, bbox_inches='tight')
+
+        from scipy.linalg import svdvals
+        svs = svdvals(embedding_matrix)
+        svs /= svs.max()
+        np.save(log_dir + '/sv.npy', svs)
+
+        sns.set(style='darkgrid')
+        sns.set_context("notebook", font_scale=1.8, rc={"lines.linewidth": 3, 'lines.markersize': 20})
+        plt.figure(figsize=(6, 4.5))
+        plt.plot(svs)
+        plt.savefig(log_dir + '/svs.pdf', format='pdf', transparent=False, bbox_inches='tight')
 
     # model evaluation
-    test_result = trainer.evaluate(test_data, load_best_model=saved, show_progress=config['show_progress'])
+    test_result = None
+    if run_test:
+        test_result = trainer.evaluate(test_data, load_best_model=saved, show_progress=config['show_progress'])
 
     logger.info(set_color('best valid ', 'yellow') + f': {best_valid_result}')
-    logger.info(set_color('test result', 'yellow') + f': {test_result}')
+    if run_test:
+        logger.info(set_color('test result', 'yellow') + f': {test_result}')
+    else:
+        logger.info(set_color('test result', 'yellow') + ': skipped')
+
+    import sys
+    from pathlib import Path as _Path
+    _repo = _Path(__file__).resolve().parents[3]
+    if str(_repo) not in sys.path:
+        sys.path.insert(0, str(_repo))
+    from ncs_logging import write_run_summary
+
+    summary = [
+        f"model={config['model']} dataset={config['dataset']}",
+        f"best valid ({config.get('valid_metric', 'valid')}): {best_valid_result}",
+    ]
+    if run_test and test_result is not None:
+        summary.append(f"test result: {test_result}")
+    write_run_summary('DuoRec', config['dataset'], summary)
 
     return {
         'best_valid_score': best_valid_score,

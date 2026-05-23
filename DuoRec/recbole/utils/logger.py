@@ -15,9 +15,11 @@ recbole.utils.logger
 
 import logging
 import os
+from datetime import datetime
+
 import colorlog
 
-from recbole.utils.utils import get_local_time, ensure_dir
+from recbole.utils.utils import ensure_dir
 from colorama import init
 
 log_colors_config = {
@@ -51,17 +53,12 @@ def init_logger(config):
     #
     # logfilepath = os.path.join(LOGROOT, logfilename)
 
-    LOGROOT = config['log_root'] if config['log_root'] else './log/'
-    LOGROOT += config['model'] + '/{}/bs{}-lmd{}-sem{}-{}-{}-lr{}-l2{}-tau{}-{}-DPh{}-DPa{}/'.format(
-        config['dataset'], config['train_batch_size'], config['lmd'], config['lmd_sem'], config['contrast'],
-        get_local_time(), config['learning_rate'], config['weight_decay'], config['tau'], config['sim'],
-        config['hidden_dropout_prob'], config['attn_dropout_prob'])
-    dir_name = os.path.dirname(LOGROOT)
-    ensure_dir(dir_name)
+    log_root = config['log_root'] if config['log_root'] else '../Log/DuoRec/'
+    log_dir = os.path.join(log_root, config['dataset'])
+    ensure_dir(log_dir)
 
-    logfilename = 'log.txt'
-
-    logfilepath = os.path.join(LOGROOT, logfilename)
+    logfilename = datetime.now().strftime('%d-%m-%Y') + '.log'
+    logfilepath = os.path.join(log_dir, logfilename)
 
     filefmt = "%(asctime)-15s %(levelname)s  %(message)s"
     filedatefmt = "%a %d %b %Y %H:%M:%S"

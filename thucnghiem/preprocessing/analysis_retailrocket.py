@@ -12,6 +12,10 @@ from collections import defaultdict
 from pathlib import Path
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_DATA_ROOT = REPO_ROOT / 'Data' / 'thucnghiem' / 'retailrocket'
+
+
 def analyze_retailrocket(data_root: str | Path) -> None:
     data_root = Path(data_root)
 
@@ -151,7 +155,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Phân tích dữ liệu RetailRocket trước preprocess."
     )
-    parser.add_argument("--data-root", type=Path, required=True, help="Path to DATA/retailrocket")
+    parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT, help="Path to Data/thucnghiem/retailrocket")
     args = parser.parse_args()
 
     analyze_retailrocket(args.data_root)

@@ -6,8 +6,15 @@ import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import DefaultDict, Iterable
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PROBLEM_NAME = 'thucnghiem'
+DEFAULT_DATA_ROOT = REPO_ROOT / 'Data' / PROBLEM_NAME / 'retailrocket'
+DEFAULT_OUTPUT_PATH = DEFAULT_DATA_ROOT / 'retailrocket_module1.json'
+DEFAULT_LOG_DIR = REPO_ROOT / 'Log' / PROBLEM_NAME / 'retailrocket'
 
 
 @dataclass(frozen=True)
@@ -292,11 +299,11 @@ def load_preprocessed_artifacts(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Preprocess RetailRocket data for CatSA Module 1.")
-    parser.add_argument("--data-root", type=Path, required=True, help="Path to DATA/retailrocket")
+    parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT, help="Path to Data/thucnghiem/retailrocket")
     parser.add_argument(
         "--output-path",
         type=Path,
-        default=Path("outputs/processed/retailrocket_module1.json"),
+        default=DEFAULT_OUTPUT_PATH,
         help="Path to the saved preprocessed artifact.",
     )
     parser.add_argument(
@@ -322,14 +329,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--log-dir",
         type=Path,
-        default=None,
-        help="Directory used to store preprocessing logs. If omitted, logs are only printed to stdout.",
+        default=DEFAULT_LOG_DIR,
+        help="Directory used to store preprocessing logs.",
     )
     parser.add_argument(
         "--log-file-name",
         type=str,
-        default="retailrocket_preprocess.log",
-        help="Log file name created inside --log-dir.",
+        default="",
+        help="Log file name inside --log-dir. Default: DD-MM-YYYY.log",
     )
     return parser.parse_args()
 
@@ -359,7 +366,8 @@ def configure_logging(log_dir: Path | None, log_file_name: str) -> logging.Logge
 
 def main() -> None:
     args = parse_args()
-    logger = configure_logging(args.log_dir, args.log_file_name)
+    log_file_name = args.log_file_name or datetime.now().strftime('%d-%m-%Y') + '.log'
+    logger = configure_logging(args.log_dir, log_file_name)
 
     events_path, category_tree_path, property_paths, resolved_root = resolve_retailrocket_file_paths(args.data_root)
 

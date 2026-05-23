@@ -1,7 +1,21 @@
-# Data folders
-DATA2/
+# =============================================================================
+# NCS workspace conventions
+# - Data/  : KHÔNG commit (dataset, artifact, checkpoint lớn)
+# - Log/     : log quá trình (full cmd output) — ĐƯỢC commit
+# - LogMins/ : kết quả cuối cùng — ĐƯỢC commit
+# =============================================================================
 
-# Python
+# --- Centralized data (never push) ---
+Data/
+.cursor/
+# Stray .log outside Log/ and LogMins/ (both trees are tracked)
+*.log
+!Log/
+!Log/**
+!LogMins/
+!LogMins/**
+
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
@@ -23,19 +37,19 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual environments
+# --- Virtual environments ---
 venv/
 ENV/
 env/
 
-# IDE
+# --- IDE ---
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
+# --- OS ---
 .DS_Store
 .DS_Store?
 ._*
@@ -43,18 +57,5 @@ env/
 .Trashes
 ehthumbs.db
 
-# Logs
-*.log
-
-# Jupyter Notebook
+# --- Jupyter Notebook ---
 .ipynb_checkpoints/
-
-# Preprocessing outputs
-preprocessed/
-diginetica/
-yoochoose*/
-sample/
-
-# Local large/raw datasets
-# CSGNN/datasets/retailrocket/
-thucnghiem2/outputs/processed/

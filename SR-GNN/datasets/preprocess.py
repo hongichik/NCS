@@ -13,11 +13,15 @@ import pickle
 import operator
 import datetime
 import os
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_DATA_ROOT = REPO_ROOT / 'Data' / 'SR-GNN'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='sample', help='dataset name: diginetica/yoochoose/sample/retailrocket')
-parser.add_argument('--data-path', default='./', help='path to data directory for retailrocket dataset')
-parser.add_argument('--output-path', default=None, help='path to output directory for processed data (default: dataset folder)')
+parser.add_argument('--data-path', default=str(DEFAULT_DATA_ROOT), help='path to data directory for retailrocket dataset')
+parser.add_argument('--output-path', default=None, help='path to output directory for processed data (default: Data/SR-GNN/<dataset>)')
 opt = parser.parse_args()
 print(opt)
 
@@ -261,14 +265,14 @@ elif opt.dataset == 'yoochoose':
     pickle.dump(tra64, open(os.path.join(output_dir1_64, 'train.txt'), 'wb'))
     pickle.dump(seq64, open(os.path.join(output_dir1_64, 'all_train_seq.txt'), 'wb'))
 elif opt.dataset == 'retailrocket':
-    output_dir = opt.output_path if opt.output_path else os.path.join(opt.data_path, 'preprocessed')
+    output_dir = opt.output_path if opt.output_path else os.path.join(opt.data_path, opt.dataset.lower())
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     pickle.dump(tra, open(os.path.join(output_dir, 'train.txt'), 'wb'))
     pickle.dump(tes, open(os.path.join(output_dir, 'test.txt'), 'wb'))
     pickle.dump(tra_seqs, open(os.path.join(output_dir, 'all_train_seq.txt'), 'wb'))
 else:
-    output_dir = opt.output_path if opt.output_path else 'sample'
+    output_dir = opt.output_path if opt.output_path else os.path.join(opt.data_path, opt.dataset.lower())
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     pickle.dump(tra, open(os.path.join(output_dir, 'train.txt'), 'wb'))

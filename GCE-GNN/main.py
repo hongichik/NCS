@@ -5,16 +5,22 @@ import os
 import sys
 import logging
 import datetime as dt
+from pathlib import Path
 from model import *
 from utils import *
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_DATA_ROOT = str(REPO_ROOT / 'Data' / 'GCE-GNN')
+DEFAULT_LOG_ROOT = str(REPO_ROOT / 'Log' / 'GCE-GNN')
 
-def setup_logging(log_dir, dataset_name):
-    """Setup logging to file and console"""
+
+def setup_logging(log_root, dataset_name):
+    """Setup logging to file and console."""
+    dataset_name = dataset_name.lower()
+    log_dir = os.path.join(log_root, dataset_name)
     os.makedirs(log_dir, exist_ok=True)
-    
-    timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = os.path.join(log_dir, f"{dataset_name}_{timestamp}.log")
+
+    log_file = os.path.join(log_dir, dt.datetime.now().strftime('%d-%m-%Y') + '.log')
     
     # Create formatter
     formatter = logging.Formatter(
@@ -62,8 +68,8 @@ def init_seed(seed=None):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='diginetica', help='diginetica/Nowplaying/Tmall/retailrocket')
-parser.add_argument('--data_path', default='datasets', help='Path to datasets directory')
-parser.add_argument('--log_dir', default='logs', help='Directory to save log files')
+parser.add_argument('--data_path', default=DEFAULT_DATA_ROOT, help='Path to datasets directory')
+parser.add_argument('--log_dir', default=DEFAULT_LOG_ROOT, help='Directory to save log files')
 parser.add_argument('--hiddenSize', type=int, default=100)
 parser.add_argument('--epoch', type=int, default=20)
 parser.add_argument('--activate', type=str, default='relu')
@@ -239,6 +245,21 @@ def main():
     end = time.time()
     logger.info(f"Run time: {end - start:.2f} s")
     logger.info("Training finished!")
+
+    import sys
+    sys.path.insert(0, str(REPO_ROOT))
+    from ncs_logging import write_run_summary
+
+    write_run_summary(
+        'GCE-GNN',
+        opt.dataset.lower(),
+        [
+            str(opt),
+            f"best Recall@20={best_result[0]:.4f} epoch={best_epoch[0]}",
+            f"best MRR@20={best_result[1]:.4f} epoch={best_epoch[1]}",
+            f"run_time_s={end - start:.2f}",
+        ],
+    )
 
 
 if __name__ == '__main__':

@@ -11,8 +11,12 @@ import os
 import pickle
 import sys
 import time
+from pathlib import Path
 from utils import build_graph, Data, split_validation
 from model import *
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_LOG_DIR = str(REPO_ROOT / 'Log' / 'SR-GNN')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='sample', help='dataset name: diginetica/yoochoose1_4/yoochoose1_64/sample')
@@ -29,7 +33,7 @@ parser.add_argument('--patience', type=int, default=10, help='the number of epoc
 parser.add_argument('--nonhybrid', action='store_true', help='only use the global preference to predict')
 parser.add_argument('--validation', action='store_true', help='validation')
 parser.add_argument('--valid_portion', type=float, default=0.1, help='split the portion of training set as validation set')
-parser.add_argument('--log_dir', default='../log', help='directory to store run logs')
+parser.add_argument('--log_dir', default=DEFAULT_LOG_DIR, help='directory to store run logs')
 parser.add_argument('--n_node', type=int, default=0, help='override number of nodes/items; 0 means auto')
 parser.add_argument('--max_session_len', type=int, default=0, help='truncate each session to last N items; 0 means no truncation')
 parser.add_argument('--max_train_samples', type=int, default=0, help='keep at most N train samples; 0 means keep all')
@@ -52,10 +56,9 @@ class Tee(object):
 
 
 def setup_logging():
-    os.makedirs(opt.log_dir, exist_ok=True)
-    timestamp = time.strftime('%Y%m%d-%H%M%S')
-    run_name = opt.dataset if opt.dataset else 'run'
-    log_path = os.path.join(opt.log_dir, '%s-%s.log' % (run_name, timestamp))
+    dataset_log_dir = os.path.join(opt.log_dir, opt.dataset.lower())
+    os.makedirs(dataset_log_dir, exist_ok=True)
+    log_path = os.path.join(dataset_log_dir, time.strftime('%d-%m-%Y') + '.log')
     log_file = open(log_path, 'a')
     sys.stdout = Tee(sys.__stdout__, log_file)
     sys.stderr = Tee(sys.__stderr__, log_file)
@@ -65,7 +68,7 @@ def setup_logging():
 def resolve_dataset_dir():
     if opt.data_path:
         return opt.data_path
-    return os.path.join('..', 'datasets', opt.dataset)
+    return str(REPO_ROOT / 'Data' / 'SR-GNN' / opt.dataset.lower())
 
 
 def infer_n_node(train_data, test_data):

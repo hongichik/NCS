@@ -14,6 +14,7 @@ recbole.data.utils
 
 import copy
 import importlib
+import inspect
 import os
 import pickle
 
@@ -166,6 +167,11 @@ def data_preparation(config, dataset, save=False):
         set_color(f'[{eval_kwargs["batch_size"]}]', 'yellow') + ', ' + set_color('shuffle', 'cyan') + ' = ' +
         set_color(f'[{eval_kwargs["shuffle"]}]\n', 'yellow')
     )
+
+    init_params = inspect.signature(dataloader.__init__).parameters
+    if 'phase' not in init_params:
+        valid_kwargs.pop('phase', None)
+        test_kwargs.pop('phase', None)
 
     valid_data = dataloader(**valid_kwargs)
     test_data = dataloader(**test_kwargs)

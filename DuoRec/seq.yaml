@@ -47,8 +47,8 @@ weight_decay: 0
 topk: [5, 10, 20, 50]
 
 # directory setting
-log_root: "./log/"
-data_path: "/dataset/"
+log_root: "../Log/DuoRec/"
+data_path: "../Data/DuoRec/"
 
 lmd: 0.1
 lmd_sem: 0.1

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -24,17 +25,23 @@ from preprocessing.session_graph_dataset import (
     fit_taxonomy_encoders,
 )
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PROBLEM_NAME = 'thucnghiem2'
+DEFAULT_DATA_ROOT = REPO_ROOT / 'Data' / PROBLEM_NAME / 'retailrocket'
+DEFAULT_PROCESSED_PATH = DEFAULT_DATA_ROOT / 'retailrocket_module1.json'
+DEFAULT_LOG_DIR = REPO_ROOT / 'Log' / PROBLEM_NAME / 'retailrocket'
+
 
 UNKNOWN_CATEGORY_ID = 0
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run CatSA Module 1 on toy data or RetailRocket.")
-    parser.add_argument("--data-root", type=Path, default=None, help="Path to DATA/retailrocket")
+    parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT, help="Path to Data/thucnghiem2/retailrocket")
     parser.add_argument(
         "--processed-path",
         type=Path,
-        default=None,
+        default=DEFAULT_PROCESSED_PATH,
         help="Path to a preprocessed RetailRocket artifact created by preprocessing.retailrocket_preprocess.",
     )
     parser.add_argument(
@@ -46,14 +53,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--log-dir",
         type=Path,
-        default=None,
-        help="Directory used to store experiment logs. If omitted, logs are only printed to stdout.",
+        default=DEFAULT_LOG_DIR,
+        help="Directory used to store experiment logs.",
     )
     parser.add_argument(
         "--log-file-name",
         type=str,
-        default="catsa_module1.log",
-        help="Log file name created inside --log-dir.",
+        default="",
+        help="Log file name inside --log-dir. Default: DD-MM-YYYY.log",
     )
     parser.add_argument("--hidden-dim", type=int, default=128)
     parser.add_argument("--num-layers", type=int, default=2)
@@ -315,7 +322,7 @@ def select_monitor_split(eval_split: str | None) -> str:
 
 def main() -> None:
     args = parse_args()
-    logger = configure_logging(args.log_dir, args.log_file_name)
+    logger = configure_logging(args.log_dir, args.log_file_name or datetime.now().strftime('%d-%m-%Y') + '.log')
     device = resolve_device(args.device)
 
     if device.type == "cuda":

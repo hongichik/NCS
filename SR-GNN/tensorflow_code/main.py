@@ -15,11 +15,15 @@ import datetime
 import os
 import sys
 import time
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_LOG_DIR = str(REPO_ROOT / 'Log' / 'SR-GNN')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='sample', help='dataset name: diginetica/yoochoose1_4/yoochoose1_64/sample')
 parser.add_argument('--data_path', default='', help='path to dataset folder that contains train.txt and test.txt')
-parser.add_argument('--log_dir', default='../log', help='directory to store run logs')
+parser.add_argument('--log_dir', default=DEFAULT_LOG_DIR, help='directory to store run logs')
 parser.add_argument('--method', type=str, default='ggnn', help='ggnn/gat/gcn')
 parser.add_argument('--validation', action='store_true', help='validation')
 parser.add_argument('--epoch', type=int, default=30, help='number of epochs to train for')
@@ -50,10 +54,9 @@ class Tee(object):
 
 
 def setup_logging():
-    os.makedirs(opt.log_dir, exist_ok=True)
-    timestamp = time.strftime('%Y%m%d-%H%M%S')
-    run_name = opt.dataset if opt.dataset else 'run'
-    log_path = os.path.join(opt.log_dir, '%s-%s.log' % (run_name, timestamp))
+    dataset_log_dir = os.path.join(opt.log_dir, opt.dataset.lower())
+    os.makedirs(dataset_log_dir, exist_ok=True)
+    log_path = os.path.join(dataset_log_dir, time.strftime('%d-%m-%Y') + '.log')
     log_file = open(log_path, 'a')
     sys.stdout = Tee(sys.__stdout__, log_file)
     sys.stderr = Tee(sys.__stderr__, log_file)
@@ -63,7 +66,7 @@ def setup_logging():
 def resolve_dataset_dir():
     if opt.data_path:
         return opt.data_path
-    return os.path.join('..', 'datasets', opt.dataset)
+    return str(REPO_ROOT / 'Data' / 'SR-GNN' / opt.dataset.lower())
 
 
 def infer_n_node(train_data, test_data):

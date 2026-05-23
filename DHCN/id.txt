@@ -1,0 +1,2 @@
+CUDA_VISIBLE_DEVICES=0 nohup python -u main.py --dataset retailrocket --data_path /data/hongnguyen/DATA2/SR-GNN/retailrocket --log retailrocket2.log --epoch 30 --batchSize 100 --embSize 100 --l2 1e-05 --lr 0.001 --layer 3 --beta 0.01 --topk 20 > output.log 2>&1 &
+[2] 31007

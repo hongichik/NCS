@@ -1,11 +1,18 @@
 import argparse
+import datetime
 import pickle
 import time
 import sys
 import torch
+from pathlib import Path
 from util import Data, split_validation
 from model import *
 import os
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+from ncs_logging import format_best_k_summary, write_run_summary
+from ncs_paths import log_file
 
 
 class TeeLogger:
@@ -51,6 +58,9 @@ parser.add_argument('--topk', default='5,10,20',
 
 opt = parser.parse_args()
 
+if not opt.log:
+    opt.log = str(log_file('DHCN', opt.dataset.lower()))
+
 # Thiết lập logging
 if opt.log:
     _tee_out = TeeLogger(opt.log, sys.stdout)
@@ -82,7 +92,7 @@ def main():
     if opt.data_path:
         base_path = opt.data_path
     else:
-        base_path = os.path.join('..', 'datasets', opt.dataset)
+        base_path = str(REPO_ROOT / 'Data' / 'DHCN' / opt.dataset.lower())
 
     train_data = pickle.load(open(os.path.join(base_path, 'train.txt'), 'rb'))
     test_data = pickle.load(open(os.path.join(base_path, 'test.txt'), 'rb'))
@@ -137,6 +147,12 @@ def main():
             print('train_loss:\t%.4f\tRecall@%d: %.4f\tMRR%d: %.4f\tEpoch: %d,  %d' %
                   (total_loss, K, best_results['metric%d' % K][0], K, best_results['metric%d' % K][1],
                    best_results['epoch%d' % K][0], best_results['epoch%d' % K][1]))
+
+    write_run_summary(
+        'DHCN',
+        opt.dataset.lower(),
+        format_best_k_summary(opt.dataset, best_results, top_K, header=str(opt)),
+    )
 
 
 if __name__ == '__main__':

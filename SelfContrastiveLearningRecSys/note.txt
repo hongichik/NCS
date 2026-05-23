@@ -1,0 +1,51 @@
+(base) hongnguyen@dsserver:~/NCS/SelfContrastiveLearningRecSys/COTREC$ cd /home/hongnguyen/NCS/SelfContrastiveLearningRecSys/COTREC
+CUDA_VISIBLE_DEVICES=0 nohup python main.py \
+--dataset RetailRocket \
+--epoch 20 \
+--batchSize 100 \
+--embSize 100 \
+--l2 1e-5 \
+--lr 0.001 \
+--layer 3 \
+--beta 0.01 \
+--temperature 0.1 \
+--item_cl_loss_weight 1.0 \
+--sampled_item_size 30000 \
+--use_item_cl_loss \
+--saved_models_path output/RetailRocket_item_cl_smoke2 \
+> train.log 2>&1 &
+[1] 457544
+
+base) hongnguyen@dsserver:~/NCS/SelfContrastiveLearningRecSys/COTREC$ cd /home/hongnguyen/NCS/SelfContrastiveLearningRecSys/DHCN
+CUDA_VISIBLE_DEVICES=0 nohup python main.py \
+--dataset RetailRocket \
+--epoch 20 \
+--batchSize 100 \
+--embSize 100 \
+--l2 1e-5 \
+--lr 0.001 \
+--layer 3 \
+--beta 0.01 \
+--temperature 0.1 \
+--item_cl_loss_weight 1.0 \
+--sampled_item_size 30000 \
+--use_item_cl_loss \
+--saved_models_path output/RetailRocket_item_cl_smoke2 \
+> train.log 2>&1 &
+[2] 457903
+
+(base) hongnguyen@dsserver:~/NCS/SelfContrastiveLearningRecSys/DHCN$ cd /home/hongnguyen/NCS/SelfContrastiveLearningRecSys/GCE-GNN
+CUDA_VISIBLE_DEVICES=0 nohup python main.py \
+--dataset RetailRocket \
+--epoch 20 \
+--batch_size 100 \
+--lr 0.001 \
+--l2 1e-5 \
+--temperature 0.1 \
+--item_cl_loss_weight 1.0 \
+--sampled_item_size 30000 \
+--use_item_cl_loss \
+--saved_models_path output/RetailRocket_item_cl_smoke2 \
+> train.log 2>&1 &
+[2]+  Exit 1                  CUDA_VISIBLE_DEVICES=0 nohup python main.py --dataset RetailRocket --epoch 20 --batchSize 100 --embSize 100 --l2 1e-5 --lr 0.001 --layer 3 --beta 0.01 --temperature 0.1 --item_cl_loss_weight 1.0 --sampled_item_size 30000 --use_item_cl_loss --saved_models_path output/RetailRocket_item_cl_smoke2 > train.log 2>&1
+[2] 457988

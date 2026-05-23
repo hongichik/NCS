@@ -194,14 +194,36 @@ def find_k_largest(K, candidates):
     # k_largest_scores = [item[0] for item in n_candidates]
     return ids#, k_largest_scores
 
+def get_overlap_gpu(session_item, device):
+    sessions = torch.as_tensor(session_item, dtype=torch.long, device=device)
+    B = sessions.shape[0]
+    nonzero_mask = sessions != 0
+    flat_items = sessions[nonzero_mask]
+    if flat_items.numel() == 0:
+        matrix = torch.eye(B, device=device)
+        degree = torch.eye(B, device=device)
+        return matrix, degree
+    unique_items, inverse = torch.unique(flat_items, return_inverse=True)
+    n_items = unique_items.shape[0]
+    row_indices = torch.arange(B, device=device).unsqueeze(1).expand_as(sessions)[nonzero_mask]
+    incidence = torch.zeros(B, n_items, device=device)
+    incidence[row_indices, inverse] = 1.0
+    intersection = incidence @ incidence.T
+    cnt = incidence.sum(dim=1, keepdim=True)
+    union = cnt + cnt.T - intersection
+    matrix = torch.where(union > 0, intersection / union, torch.zeros_like(intersection))
+    matrix.fill_diagonal_(1.0)
+    degree = matrix.sum(dim=1).clamp(min=1.0)
+    degree = torch.diag(1.0 / degree)
+    return matrix, degree
+
+
 def forward(model, i, data):
     tar, session_len, session_item, reversed_sess_item, mask = data.get_slice(i)
-    A_hat, D_hat = data.get_overlap(session_item)
     dev = model.embedding.weight.device
+    A_hat, D_hat = get_overlap_gpu(session_item, dev)
     session_item = torch.as_tensor(session_item, dtype=torch.long, device=dev)
     session_len = torch.as_tensor(session_len, dtype=torch.long, device=dev)
-    A_hat = torch.as_tensor(A_hat, dtype=torch.float32, device=dev)
-    D_hat = torch.as_tensor(D_hat, dtype=torch.float32, device=dev)
     tar = torch.as_tensor(tar, dtype=torch.long, device=dev)
     mask = torch.as_tensor(mask, dtype=torch.long, device=dev)
     reversed_sess_item = torch.as_tensor(reversed_sess_item, dtype=torch.long, device=dev)

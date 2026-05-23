@@ -3,7 +3,7 @@ Code for WSDM 2022 paper, [Contrastive Learning for Representation Degeneration 
 
 # Usage
 
-Download datasets from [RecSysDatasets](https://github.com/RUCAIBox/RecSysDatasets) or their [Google Drive](https://drive.google.com/drive/folders/1ahiLmzU7cGRPXf5qGMqtAChte2eYp9gI). And put the files in `./dataset/` like the following.
+Download datasets from [RecSysDatasets](https://github.com/RUCAIBox/RecSysDatasets) or their [Google Drive](https://drive.google.com/drive/folders/1ahiLmzU7cGRPXf5qGMqtAChte2eYp9gI). Put files in `../Data/DuoRec/<dataset>/` at the repo root.
 
 ```
 $ tree

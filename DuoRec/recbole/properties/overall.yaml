@@ -4,7 +4,7 @@ use_gpu: True
 seed: 2020
 state: INFO
 reproducibility: True
-data_path: 'dataset/'
+data_path: '../Data/DuoRec/'
 checkpoint_dir: 'saved'
 show_progress: True
 

@@ -1,12 +1,15 @@
 import argparse
 import pickle
 import time
+from pathlib import Path
 
 from torch.backends import cudnn
 
 from util import Data
 from model import *
 import os
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='diginetica', help='dataset name: diginetica/nowplaying')
@@ -39,7 +42,7 @@ setup_seed(2021)
 
 
 def main():
-    dataset_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'datasets')
+    dataset_root = str(REPO_ROOT / 'Data' / 'CSGNN')
     # 选择不同过滤规则的数据集
     train_data = pickle.load(open(os.path.join(dataset_root, opt.dataset, 'filter20', 'train.txt'), 'rb'))
     test_data = pickle.load(open(os.path.join(dataset_root, opt.dataset, 'filter20', 'test.txt'), 'rb'))

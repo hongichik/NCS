@@ -3,6 +3,11 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_INPUT = REPO_ROOT / 'Data' / 'thucnghiem2' / 'retailrocket' / 'retailrocket_module1.json'
+DEFAULT_OUTPUT = REPO_ROOT / 'Data' / 'thucnghiem2' / 'retailrocket' / 'retailrocket_augmentation.json'
+
+
 def create_augmentation_dicts(input_path: Path, output_path: Path) -> None:
     print(f"Loading data from {input_path}")
     with input_path.open("r", encoding="utf-8") as f:
@@ -24,7 +29,8 @@ def create_augmentation_dicts(input_path: Path, output_path: Path) -> None:
         if len(items) > 1:
             for item in items:
                 same = [i for i in items if i != item]
-                if len(same) > 20: same = random.sample(same, 20)
+                if len(same) > 20:
+                    same = random.sample(same, 20)
                 dict_same_leaf[item] = same
 
     # dict_sibling: item_id -> list of item_ids
@@ -35,7 +41,6 @@ def create_augmentation_dicts(input_path: Path, output_path: Path) -> None:
     dict_sibling = {}
     for parent, leafs in parent2leafs.items():
         if len(leafs) > 1:
-            # build the union of all items from sibling leafs
             for leaf in leafs:
                 sibling_items = []
                 for other_leaf in leafs:
@@ -52,21 +57,24 @@ def create_augmentation_dicts(input_path: Path, output_path: Path) -> None:
         "dict_same_leaf": dict_same_leaf,
         "dict_sibling": dict_sibling
     }
-    
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as f:
         json.dump(out_payload, f, ensure_ascii=False)
-        
+
     print(f"Saved to {output_path}")
+
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=str, default="outputs/processed/retailrocket_module1.json")
-    parser.add_argument("--output", type=str, default="outputs/processed/retailrocket_augmentation.json")
+    parser.add_argument("--input", type=str, default=str(DEFAULT_INPUT))
+    parser.add_argument("--output", type=str, default=str(DEFAULT_OUTPUT))
     args = parser.parse_args()
-    
+
     input_path = Path(args.input)
     output_path = Path(args.output)
     create_augmentation_dicts(input_path, output_path)
+
 
 if __name__ == "__main__":
     main()

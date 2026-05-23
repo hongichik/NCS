@@ -1,0 +1,180 @@
+#!/usr/bin/env python36
+# -*- coding: utf-8 -*-
+"""
+Created on July, 2018
+
+@author: Tangrizzly
+"""
+
+import argparse
+import os
+import pickle
+import sys
+import time
+from pathlib import Path
+from utils import build_graph, Data, split_validation
+from model import *
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_LOG_DIR = str(REPO_ROOT / 'Log' / 'SR-GNN')
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--dataset', default='sample', help='dataset name: diginetica/yoochoose1_4/yoochoose1_64/sample')
+parser.add_argument('--data_path', default='', help='path to dataset folder that contains train.txt and test.txt')
+parser.add_argument('--batchSize', type=int, default=100, help='input batch size')
+parser.add_argument('--hiddenSize', type=int, default=100, help='hidden state size')
+parser.add_argument('--epoch', type=int, default=30, help='the number of epochs to train for')
+parser.add_argument('--lr', type=float, default=0.001, help='learning rate')  # [0.001, 0.0005, 0.0001]
+parser.add_argument('--lr_dc', type=float, default=0.1, help='learning rate decay rate')
+parser.add_argument('--lr_dc_step', type=int, default=3, help='the number of steps after which the learning rate decay')
+parser.add_argument('--l2', type=float, default=1e-5, help='l2 penalty')  # [0.001, 0.0005, 0.0001, 0.00005, 0.00001]
+parser.add_argument('--step', type=int, default=1, help='gnn propogation steps')
+parser.add_argument('--patience', type=int, default=10, help='the number of epoch to wait before early stop ')
+parser.add_argument('--nonhybrid', action='store_true', help='only use the global preference to predict')
+parser.add_argument('--validation', action='store_true', help='validation')
+parser.add_argument('--valid_portion', type=float, default=0.1, help='split the portion of training set as validation set')
+parser.add_argument('--log_dir', default=DEFAULT_LOG_DIR, help='directory to store run logs')
+parser.add_argument('--n_node', type=int, default=0, help='override number of nodes/items; 0 means auto')
+parser.add_argument('--max_session_len', type=int, default=0, help='truncate each session to last N items; 0 means no truncation')
+parser.add_argument('--max_train_samples', type=int, default=0, help='keep at most N train samples; 0 means keep all')
+parser.add_argument('--max_test_samples', type=int, default=0, help='keep at most N test samples; 0 means keep all')
+opt = parser.parse_args()
+
+
+class Tee(object):
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data):
+        for stream in self.streams:
+            stream.write(data)
+            stream.flush()
+
+    def flush(self):
+        for stream in self.streams:
+            stream.flush()
+
+
+def setup_logging():
+    dataset_log_dir = os.path.join(opt.log_dir, opt.dataset.lower())
+    os.makedirs(dataset_log_dir, exist_ok=True)
+    log_path = os.path.join(dataset_log_dir, time.strftime('%d-%m-%Y') + '.log')
+    log_file = open(log_path, 'a')
+    sys.stdout = Tee(sys.__stdout__, log_file)
+    sys.stderr = Tee(sys.__stderr__, log_file)
+    print('Log file: %s' % os.path.abspath(log_path))
+
+
+def resolve_dataset_dir():
+    if opt.data_path:
+        return opt.data_path
+    return str(REPO_ROOT / 'Data' / 'SR-GNN' / opt.dataset.lower())
+
+
+def infer_n_node(train_data, test_data):
+    max_item_id = 0
+    for data in (train_data, test_data):
+        if data is None:
+            continue
+        seqs, targets = data
+        if len(seqs) > 0:
+            seq_max = max([max(seq) if len(seq) > 0 else 0 for seq in seqs])
+            max_item_id = max(max_item_id, seq_max)
+        if len(targets) > 0:
+            max_item_id = max(max_item_id, int(max(targets)))
+    # Item ids are 1-based and 0 is padding, so add 1 for embedding size.
+    return int(max_item_id) + 1
+
+
+def get_dataset_stats(data):
+    seqs, _ = data
+    n_samples = len(seqs)
+    max_len = max([len(seq) for seq in seqs]) if n_samples > 0 else 0
+    avg_len = (sum([len(seq) for seq in seqs]) * 1.0 / n_samples) if n_samples > 0 else 0.0
+    return n_samples, max_len, avg_len
+
+
+def maybe_limit_data(data, max_session_len=0, max_samples=0):
+    seqs, targets = data
+    if max_session_len > 0:
+        seqs = [seq[-max_session_len:] for seq in seqs]
+    if max_samples > 0 and len(seqs) > max_samples:
+        seqs = seqs[-max_samples:]
+        targets = targets[-max_samples:]
+    return seqs, targets
+
+
+def main():
+    setup_logging()
+    print(opt)
+    dataset_dir = resolve_dataset_dir()
+    train_path = os.path.join(dataset_dir, 'train.txt')
+    test_path = os.path.join(dataset_dir, 'test.txt')
+    train_data = pickle.load(open(train_path, 'rb'))
+    if opt.validation:
+        train_data, valid_data = split_validation(train_data, opt.valid_portion)
+        test_data = valid_data
+    else:
+        test_data = pickle.load(open(test_path, 'rb'))
+
+    tr_n, tr_max_len, tr_avg_len = get_dataset_stats(train_data)
+    te_n, te_max_len, te_avg_len = get_dataset_stats(test_data)
+    print('Before limiting - train samples: %d, max len: %d, avg len: %.2f' % (tr_n, tr_max_len, tr_avg_len))
+    print('Before limiting - test samples: %d, max len: %d, avg len: %.2f' % (te_n, te_max_len, te_avg_len))
+
+    train_data = maybe_limit_data(train_data, opt.max_session_len, opt.max_train_samples)
+    test_data = maybe_limit_data(test_data, opt.max_session_len, opt.max_test_samples)
+
+    tr_n, tr_max_len, tr_avg_len = get_dataset_stats(train_data)
+    te_n, te_max_len, te_avg_len = get_dataset_stats(test_data)
+    print('After limiting - train samples: %d, max len: %d, avg len: %.2f' % (tr_n, tr_max_len, tr_avg_len))
+    print('After limiting - test samples: %d, max len: %d, avg len: %.2f' % (te_n, te_max_len, te_avg_len))
+
+    # all_train_seq = pickle.load(open('../datasets/' + opt.dataset + '/all_train_seq.txt', 'rb'))
+    # g = build_graph(all_train_seq)
+
+    if opt.n_node > 0:
+        n_node = opt.n_node
+    elif opt.dataset == 'diginetica':
+        n_node = 43098
+    elif opt.dataset == 'yoochoose1_64' or opt.dataset == 'yoochoose1_4':
+        n_node = 37484
+    else:
+        n_node = infer_n_node(train_data, test_data)
+    print('Using n_node:', n_node)
+
+    train_data = Data(train_data, shuffle=True)
+    test_data = Data(test_data, shuffle=False)
+    # del all_train_seq, g
+
+    model = trans_to_cuda(SessionGraph(opt, n_node))
+
+    start = time.time()
+    best_result = [0, 0]
+    best_epoch = [0, 0]
+    bad_counter = 0
+    for epoch in range(opt.epoch):
+        print('-------------------------------------------------------')
+        print('epoch: ', epoch)
+        hit, mrr = train_test(model, train_data, test_data)
+        flag = 0
+        if hit >= best_result[0]:
+            best_result[0] = hit
+            best_epoch[0] = epoch
+            flag = 1
+        if mrr >= best_result[1]:
+            best_result[1] = mrr
+            best_epoch[1] = epoch
+            flag = 1
+        print('Best Result:')
+        print('\tRecall@20:\t%.4f\tMMR@20:\t%.4f\tEpoch:\t%d,\t%d'% (best_result[0], best_result[1], best_epoch[0], best_epoch[1]))
+        bad_counter += 1 - flag
+        if bad_counter >= opt.patience:
+            break
+    print('-------------------------------------------------------')
+    end = time.time()
+    print("Run time: %f s" % (end - start))
+
+
+if __name__ == '__main__':
+    main()

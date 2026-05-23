@@ -1,0 +1,170 @@
+import argparse
+import datetime
+import pickle
+import sys
+import time
+from pathlib import Path
+
+from torch.backends import cudnn
+
+from util import Data, split_validation, get_embedding
+from model import *
+import os
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+from ncs_logging import format_best_k_summary, write_run_summary
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--dataset', default='nowplaying', help='dataset name: diginetica/nowplaying/retailrocket') #514修改默认值tmall到diginetica
+parser.add_argument('--epoch', type=int, default=10, help='number of epochs to train for')  #514修改默认值30到10
+parser.add_argument('--batchSize', type=int, default=64, help='input batch size')
+parser.add_argument('--embSize', type=int, default=8, help='embedding size')
+parser.add_argument('--l2', type=float, default=1e-5, help='l2 penalty')
+parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
+parser.add_argument('--layer', type=int, default=3, help='the number of layer used')
+parser.add_argument('--beta', type=float, default=0, help='ssl task maginitude') #514修改0.05到0——自监督过程
+parser.add_argument('--filter', type=bool, default=False, help='filter incidence matrix')
+parser.add_argument('--gpu_id', type=int, default=0)
+parser.add_argument('--log_dir', default='', help='directory to save training logs; empty uses Log/CSGNN/<dataset>/')
+parser.add_argument('--log_file', default='', help='log filename; default DD-MM-YYYY.log')
+parser.add_argument('--topk', type=int, default=20, help='evaluate only Recall@K and MRR@K')
+opt = parser.parse_args()#解析参数
+
+
+class Tee:
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data):
+        for s in self.streams:
+            s.write(data)
+        return len(data)
+
+    def flush(self):
+        for s in self.streams:
+            s.flush()
+
+
+def configure_logging():
+    if not opt.log_dir:
+        opt.log_dir = str(REPO_ROOT / 'Log' / 'CSGNN' / opt.dataset.lower())
+    os.makedirs(opt.log_dir, exist_ok=True)
+    if opt.log_file:
+        log_name = opt.log_file
+    else:
+        log_name = datetime.datetime.now().strftime('%d-%m-%Y') + '.log'
+    log_path = os.path.join(opt.log_dir, log_name)
+    log_fp = open(log_path, 'w', buffering=1)
+    sys.stdout = Tee(sys.__stdout__, log_fp)
+    sys.stderr = Tee(sys.__stderr__, log_fp)
+    print('log file:', log_path)
+
+
+configure_logging()
+print(opt)
+# print('global session + local session + sa + line + dual cate dual pos ')
+print('数据稀疏度实验 SSL的影响')
+os.environ['CUDA_VISIBLE_DEVICES'] = str(opt.gpu_id)
+
+#设置固定种子
+def setup_seed(seed):
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
+    cudnn.deterministic = True #告诉PyTorch在使用cuDNN时总是使用相同的算法，即使牺牲一些性能也确保每次运行代码得到的结果一致
+
+
+setup_seed(2021)
+
+
+def main():
+    dataset_root = str(REPO_ROOT / 'Data' / 'CSGNN')
+    # 选择不同长度的session
+    # train_data = pickle.load(open('../datasets/' + opt.dataset + '/len/len10/train.txt', 'rb'))
+    # test_data = pickle.load(open('../datasets/' + opt.dataset + '/len/len10/test.txt', 'rb'))
+    # train_cate = pickle.load(open('../datasets/' + opt.dataset + '/len/len10/category_train.txt', 'rb'))
+    # test_cate = pickle.load(open('../datasets/' + opt.dataset + '/len/len10/category_test.txt', 'rb'))
+    # 7.15
+    # train_data = pickle.load(open('../datasets/' + opt.dataset + '/filter10/train.txt', 'rb'))
+    # test_data = pickle.load(open('../datasets/' + opt.dataset + '/filter10/test.txt', 'rb'))
+    # train_cate = pickle.load(open('../datasets/' + opt.dataset + '/filter10/category_train.txt', 'rb'))
+    # test_cate = pickle.load(open('../datasets/' + opt.dataset + '/filter10/category_test.txt', 'rb'))
+    train_data = pickle.load(open(os.path.join(dataset_root, opt.dataset, 'id', 'train.txt'), 'rb'))
+    test_data = pickle.load(open(os.path.join(dataset_root, opt.dataset, 'id', 'test.txt'), 'rb'))
+    train_cate = pickle.load(open(os.path.join(dataset_root, opt.dataset, 'id', 'category_train.txt'), 'rb'))
+    test_cate = pickle.load(open(os.path.join(dataset_root, opt.dataset, 'id', 'category_test.txt'), 'rb'))
+    print('-----train length: %d ----' % len(train_data[0]))
+    print('-----test length: %d ----' % len(test_data[0]))
+
+    # Derive ID spaces from actual train+test data to avoid hardcoded mismatches.
+    max_item_session = max(
+        max((max(session) for session in train_data[0] if len(session) > 0), default=0),
+        max((max(session) for session in test_data[0] if len(session) > 0), default=0)
+    )
+    max_item_target = max(int(np.max(train_data[1])), int(np.max(test_data[1])))
+    n_node = max(max_item_session, max_item_target)
+
+    max_cat_session = max(
+        max((max(category) for category in train_cate[0] if len(category) > 0), default=0),
+        max((max(category) for category in test_cate[0] if len(category) > 0), default=0)
+    )
+    max_cat_target = 0
+    if len(train_cate) > 1 and len(test_cate) > 1:
+        max_cat_target = max(int(np.max(train_cate[1])), int(np.max(test_cate[1])))
+    c_node = max(max_cat_session, max_cat_target)
+	#在每个epoch开始前对训练数据进行打乱，防止模型学习到数据的特定顺序：shuffle=True,Data()在util中
+    train_data = Data(train_data, train_cate, shuffle=True, n_node=n_node, c_node=c_node)
+    test_data = Data(test_data, test_cate, shuffle=False, n_node=n_node, c_node=c_node, build_adjacency=False)
+    n_node, c_node = train_data.n_node, train_data.c_node
+    # embedding_matrix = get_embedding(opt.dataset, n_node + c_node, opt.embSize)
+    embedding_matrix = None
+    model = trans_to_cuda(
+        DHCN(adjacency=train_data.adjacency, # 训练数据的邻接矩阵，表示图的结构
+		n_node=n_node, # 图中节点的数量
+		c_node=c_node, # 图中节点类别的数量
+		lr=opt.lr, # 学习率，用于优化算法
+		l2=opt.l2, # L2正则化系数，防止过拟合
+		beta=opt.beta,# 是一个特定的超参数，自监督部分
+             layers=opt.layer,# 模型的层数
+             emb_size=opt.embSize,# 嵌入向量的维度大小 
+			 batch_size=opt.batchSize, # 训练时的批量大小
+			 dataset=opt.dataset, # 数据集标识或参数，可能影响模型的某些行为
+			 embedding=embedding_matrix))# 预训练的嵌入矩阵，用于初始化节点嵌入
+
+    top_K = [opt.topk]
+    best_results = {}
+    for K in top_K:
+        best_results['epoch%d' % K] = [0, 0]
+        best_results['metric%d' % K] = [0, 0]
+
+    for epoch in range(opt.epoch):
+        print('-------------------------------------------------------')
+        print('epoch: ', epoch)
+        metrics, total_loss = train_test(model, train_data, test_data, top_K)
+        for K in top_K:
+            metrics['hit%d' % K] = np.mean(metrics['hit%d' % K]) * 100
+            metrics['mrr%d' % K] = np.mean(metrics['mrr%d' % K]) * 100
+            if best_results['metric%d' % K][0] < metrics['hit%d' % K]:
+                best_results['metric%d' % K][0] = metrics['hit%d' % K]
+                best_results['epoch%d' % K][0] = epoch
+            if best_results['metric%d' % K][1] < metrics['mrr%d' % K]:
+                best_results['metric%d' % K][1] = metrics['mrr%d' % K]
+                best_results['epoch%d' % K][1] = epoch
+        print(metrics)
+        for K in top_K:
+            print('train_loss:\t%.4f\tRecall@%d: %.4f\tMRR%d: %.4f\tEpoch: %d,  %d' %
+                  (total_loss, K, best_results['metric%d' % K][0], K, best_results['metric%d' % K][1],
+                   best_results['epoch%d' % K][0], best_results['epoch%d' % K][1]))
+
+    write_run_summary(
+        'CSGNN',
+        opt.dataset.lower(),
+        format_best_k_summary(opt.dataset, best_results, top_K, header=str(opt)),
+    )
+
+
+if __name__ == '__main__':
+    main()

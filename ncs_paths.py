@@ -7,6 +7,24 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent
 
+# Code location of each project (Data/Log/LogMins still use <problem> name at repo root).
+PROJECT_DIRS: dict[str, str] = {
+    "SR-GNN": "nhom1/SR-GNN",
+    "GCE-GNN": "nhom1/GCE-GNN",
+    "DHCN": "nhom2/DHCN",
+    "COTREC": "nhom2/COTREC",
+    "CSGNN": "nhom2/CSGNN",
+    "DuoRec": "nhom3/DuoRec",
+    "SelfContrastiveLearningRecSys": "nhom3/SelfContrastiveLearningRecSys",
+    "thucnghiem": "MyProject/thucnghiem",
+    "thucnghiem2": "MyProject/thucnghiem2",
+}
+
+
+def project_code_dir(problem: str) -> Path:
+    rel = PROJECT_DIRS.get(problem, problem)
+    return REPO_ROOT / rel
+
 
 def data_dir(problem: str, dataset: str) -> Path:
     return REPO_ROOT / "Data" / problem / dataset.lower()

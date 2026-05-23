@@ -1,0 +1,266 @@
+import time
+import argparse
+import pickle
+import os
+import sys
+import logging
+import datetime as dt
+from pathlib import Path
+from model import *
+from utils import *
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_DATA_ROOT = str(REPO_ROOT / 'Data' / 'GCE-GNN')
+DEFAULT_LOG_ROOT = str(REPO_ROOT / 'Log' / 'GCE-GNN')
+
+
+def setup_logging(log_root, dataset_name):
+    """Setup logging to file and console."""
+    dataset_name = dataset_name.lower()
+    log_dir = os.path.join(log_root, dataset_name)
+    os.makedirs(log_dir, exist_ok=True)
+
+    log_file = os.path.join(log_dir, dt.datetime.now().strftime('%d-%m-%Y') + '.log')
+    
+    # Create formatter
+    formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # Setup root logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    
+    # File handler
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    return log_file
+
+
+def calculate_num_node(train_data):
+    """Auto-calculate num_node from training data"""
+    all_items = set()
+    for sequence in train_data[0]:
+        all_items.update(sequence)
+    # Return max item id + 1 (assuming 0-based indexing)
+    num_node = max(all_items) + 1 if all_items else 1
+    return num_node
+
+
+def init_seed(seed=None):
+    if seed is None:
+        seed = int(time.time() * 1000 // 1000)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--dataset', default='diginetica', help='diginetica/Nowplaying/Tmall/retailrocket')
+parser.add_argument('--data_path', default=DEFAULT_DATA_ROOT, help='Path to datasets directory')
+parser.add_argument('--log_dir', default=DEFAULT_LOG_ROOT, help='Directory to save log files')
+parser.add_argument('--hiddenSize', type=int, default=100)
+parser.add_argument('--epoch', type=int, default=20)
+parser.add_argument('--activate', type=str, default='relu')
+parser.add_argument('--n_sample_all', type=int, default=12)
+parser.add_argument('--n_sample', type=int, default=12)
+parser.add_argument('--batch_size', type=int, default=100)
+parser.add_argument('--lr', type=float, default=0.001, help='learning rate.')
+parser.add_argument('--lr_dc', type=float, default=0.1, help='learning rate decay.')
+parser.add_argument('--lr_dc_step', type=int, default=3, help='the number of steps after which the learning rate decay.')
+parser.add_argument('--l2', type=float, default=1e-5, help='l2 penalty ')
+parser.add_argument('--n_iter', type=int, default=1)                                    # [1, 2]
+parser.add_argument('--dropout_gcn', type=float, default=0, help='Dropout rate.')       # [0, 0.2, 0.4, 0.6, 0.8]
+parser.add_argument('--dropout_local', type=float, default=0, help='Dropout rate.')     # [0, 0.5]
+parser.add_argument('--dropout_global', type=float, default=0.5, help='Dropout rate.')
+parser.add_argument('--validation', action='store_true', help='validation')
+parser.add_argument('--valid_portion', type=float, default=0.1, help='split the portion')
+parser.add_argument('--alpha', type=float, default=0.2, help='Alpha for the leaky_relu.')
+parser.add_argument('--patience', type=int, default=3)
+parser.add_argument('--auto_num_node', action='store_true', help='Auto-calculate num_node from data')
+parser.add_argument('--max_session_len', type=int, default=None, help='Cap session length to reduce memory')
+parser.add_argument('--max_train_samples', type=int, default=None, help='Limit training samples to reduce memory')
+parser.add_argument('--max_test_samples', type=int, default=None, help='Limit test samples to reduce memory')
+parser.add_argument('--num_workers', type=int, default=0, help='DataLoader workers (0 reduces RAM spikes)')
+parser.add_argument('--pin_memory', action='store_true', help='Enable DataLoader pin_memory')
+
+opt = parser.parse_args()
+
+
+def build_graph_cache_from_seq(seq, num_node, sample_num):
+    """Build adjacency and weight cache, equivalent to build_graph.py behavior."""
+    adj_count = [dict() for _ in range(num_node)]
+
+    for data in seq:
+        for k in range(1, 4):
+            for j in range(len(data) - k):
+                u, v = data[j], data[j + k]
+                if 0 <= u < num_node and 0 <= v < num_node:
+                    adj_count[u][v] = adj_count[u].get(v, 0) + 1
+                    adj_count[v][u] = adj_count[v].get(u, 0) + 1
+
+    adj = [[] for _ in range(num_node)]
+    weight = [[] for _ in range(num_node)]
+    for node in range(num_node):
+        pairs = sorted(adj_count[node].items(), key=lambda x: x[1], reverse=True)
+        adj[node] = [v for v, _ in pairs[:sample_num]]
+        weight[node] = [w for _, w in pairs[:sample_num]]
+    return adj, weight
+
+
+def limit_samples(data_tuple, max_samples):
+    if max_samples is None:
+        return data_tuple
+    x, y = data_tuple
+    n = min(len(x), int(max_samples))
+    return x[:n], y[:n]
+
+
+def main():
+    # Setup logging
+    log_file = setup_logging(opt.log_dir, opt.dataset)
+    logger = logging.getLogger()
+    logger.info(f"Log file: {log_file}")
+    
+    init_seed(2020)
+    
+    # Build dataset path
+    dataset_path = os.path.join(opt.data_path, opt.dataset)
+    if os.path.exists(os.path.join(opt.data_path, 'train.txt')):
+        dataset_path = opt.data_path
+
+    # Safer defaults for large datasets if user does not pass explicit caps
+    if opt.dataset.lower() == 'retailrocket' and opt.max_session_len is None:
+        opt.max_session_len = 20
+    
+    # Load training data first to calculate num_node if needed
+    train_data_file = os.path.join(dataset_path, 'train.txt')
+    train_data = pickle.load(open(train_data_file, 'rb'))
+    
+    # Calculate or set num_node
+    if opt.auto_num_node or opt.dataset == 'retailrocket':
+        num_node = calculate_num_node(train_data)
+        logger.info(f"Auto-calculated num_node: {num_node}")
+    else:
+        if opt.dataset == 'diginetica':
+            num_node = 43098
+            opt.n_iter = 2
+            opt.dropout_gcn = 0.2
+            opt.dropout_local = 0.0
+        elif opt.dataset == 'Nowplaying':
+            num_node = 60417
+            opt.n_iter = 1
+            opt.dropout_gcn = 0.0
+            opt.dropout_local = 0.0
+        elif opt.dataset == 'Tmall':
+            num_node = 40728
+            opt.n_iter = 1
+            opt.dropout_gcn = 0.6
+            opt.dropout_local = 0.5
+        else:
+            num_node = calculate_num_node(train_data)
+            logger.info(f"Unknown dataset, auto-calculated num_node: {num_node}")
+    
+    if opt.validation:
+        train_data, valid_data = split_validation(train_data, opt.valid_portion)
+        test_data = valid_data
+    else:
+        test_data_file = os.path.join(dataset_path, 'test.txt')
+        test_data = pickle.load(open(test_data_file, 'rb'))
+
+    train_data = limit_samples(train_data, opt.max_train_samples)
+    test_data = limit_samples(test_data, opt.max_test_samples)
+
+    adj_file = os.path.join(dataset_path, f'adj_{opt.n_sample_all}.pkl')
+    num_file = os.path.join(dataset_path, f'num_{opt.n_sample_all}.pkl')
+    
+    if not os.path.exists(adj_file) or not os.path.exists(num_file):
+        logger.info('adj/num cache not found, building graph cache from training sequences...')
+        seq_file = os.path.join(dataset_path, 'all_train_seq.txt')
+        if os.path.exists(seq_file):
+            seq = pickle.load(open(seq_file, 'rb'))
+        else:
+            # Fallback: derive sequences from train.txt format (x, y)
+            seq = train_data[0]
+
+        adj_raw, num_raw = build_graph_cache_from_seq(seq, num_node, opt.n_sample_all)
+        pickle.dump(adj_raw, open(adj_file, 'wb'))
+        pickle.dump(num_raw, open(num_file, 'wb'))
+        logger.info(f'Built and saved: {adj_file}')
+        logger.info(f'Built and saved: {num_file}')
+
+    adj = pickle.load(open(adj_file, 'rb'))
+    num = pickle.load(open(num_file, 'rb'))
+    logger.info(f"train samples: {len(train_data[0])}, test samples: {len(test_data[0])}")
+    logger.info(f"max_session_len: {opt.max_session_len}, num_workers: {opt.num_workers}, pin_memory: {opt.pin_memory}")
+
+    train_data = Data(train_data, train_len=opt.max_session_len)
+    test_data = Data(test_data, train_len=opt.max_session_len)
+
+    adj, num = handle_adj(adj, num_node, opt.n_sample_all, num)
+    model = trans_to_cuda(CombineGraph(opt, num_node, adj, num))
+
+    logger.info(str(opt))
+    logger.info(f"num_node: {num_node}")
+    logger.info("Training started...")
+    
+    start = time.time()
+    best_result = [0, 0]
+    best_epoch = [0, 0]
+    bad_counter = 0
+
+    for epoch in range(opt.epoch):
+        logger.info('-------------------------------------------------------')
+        logger.info(f'epoch: {epoch}')
+        hit, mrr = train_test(model, train_data, test_data)
+        flag = 0
+        if hit >= best_result[0]:
+            best_result[0] = hit
+            best_epoch[0] = epoch
+            flag = 1
+        if mrr >= best_result[1]:
+            best_result[1] = mrr
+            best_epoch[1] = epoch
+            flag = 1
+        logger.info('Current Result:')
+        logger.info(f'\tRecall@20:\t{hit:.4f}\tMRR@20:\t{mrr:.4f}')
+        logger.info('Best Result:')
+        logger.info(f'\tRecall@20:\t{best_result[0]:.4f}\tMRR@20:\t{best_result[1]:.4f}\tEpoch:\t{best_epoch[0]},\t{best_epoch[1]}')
+        bad_counter += 1 - flag
+        if bad_counter >= opt.patience:
+            logger.info(f"Early stopping at epoch {epoch}")
+            break
+    logger.info('-------------------------------------------------------')
+    end = time.time()
+    logger.info(f"Run time: {end - start:.2f} s")
+    logger.info("Training finished!")
+
+    import sys
+    sys.path.insert(0, str(REPO_ROOT))
+    from ncs_logging import write_run_summary
+
+    write_run_summary(
+        'GCE-GNN',
+        opt.dataset.lower(),
+        [
+            str(opt),
+            f"best Recall@20={best_result[0]:.4f} epoch={best_epoch[0]}",
+            f"best MRR@20={best_result[1]:.4f} epoch={best_epoch[1]}",
+            f"run_time_s={end - start:.2f}",
+        ],
+    )
+
+
+if __name__ == '__main__':
+    main()

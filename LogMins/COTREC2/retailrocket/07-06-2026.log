@@ -1,0 +1,4 @@
+COTREC2 on CatSA data | split_mode=catsa | n_node=60520 | Namespace(batchSize=100, beta=0.01, data_dir=None, dataset='retailrocket', embSize=100, epoch=1, eps=0.2, l2=1e-05, lam=0.005, layer=2, lr=0.001, max_test_samples=2000, max_train_samples=5000, smoke=True)
+best Recall@5=37.8500 epoch=0 | best MRR@5=32.1658 epoch=0
+best Recall@10=40.4000 epoch=0 | best MRR@10=32.5105 epoch=0
+best Recall@20=43.3000 epoch=0 | best MRR@20=32.7127 epoch=0

@@ -13,6 +13,7 @@ PROJECT_DIRS: dict[str, str] = {
     "GCE-GNN": "nhom1/GCE-GNN",
     "DHCN": "nhom2/DHCN",
     "COTREC": "nhom2/COTREC",
+    "COTREC2": "nhom2/COTREC2",
     "CatSA": "nhom2/CatSA",
     "CSGNN": "nhom2/CSGNN",
     "DuoRec": "nhom3/DuoRec",

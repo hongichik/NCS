@@ -1,0 +1,5 @@
+
+============================================================
+COTREC2 run 2026-06-07 20:11:30.146838 args=Namespace(batchSize=100, beta=0.01, data_dir=None, dataset='retailrocket', embSize=100, epoch=1, eps=0.2, l2=1e-05, lam=0.005, layer=2, lr=0.001, max_test_samples=2000, max_train_samples=5000, smoke=True)
+meta={'source': '/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/Data/CatSA/retailrocket/retailrocket.json', 'protocol': 'SR-GNN/COTREC', 'split_mode': 'catsa', 'num_items': 60520, 'n_train_sessions': 221844, 'n_test_sessions': 15437, 'n_graph_sessions': 285228, 'n_train_samples': 721237, 'n_test_samples': 54920}
+epoch=0 loss=389.0266 HR@20=43.3000 MRR@20=32.7127

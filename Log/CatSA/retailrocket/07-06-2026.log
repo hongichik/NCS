@@ -1,0 +1,9 @@
+2026-06-07 09:16:20,429 | INFO | source_root=/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/Data/datagoc/Retailrocket (resolved=/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/Data/datagoc/Retailrocket)
+2026-06-07 09:16:40,801 | INFO | sessions_after_filter=332447
+2026-06-07 09:16:44,905 | INFO | train_sessions=316920 test_sessions=15437 num_items=60520
+2026-06-07 09:18:31,857 | INFO | saved /Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/Data/CatSA/retailrocket/retailrocket.json
+2026-06-07 09:18:31,857 | INFO | saved /Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/Data/CatSA/retailrocket/lookup_tables.pkl
+2026-06-07 09:18:31,858 | INFO | |C|=942 items_with_cat=55617
+2026-06-07 09:18:31,858 | INFO | split train: 221844 sessions
+2026-06-07 09:18:31,858 | INFO | split valid: 63384 sessions
+2026-06-07 09:18:31,858 | INFO | split test: 15437 sessions

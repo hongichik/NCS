@@ -57,8 +57,16 @@ def parse_args() -> argparse.Namespace:
         help="auto: cuda > mps > cpu",
     )
     p.add_argument("--metric-k", type=int, default=20)
-    p.add_argument("--smoke", action="store_true", help="Quick run: 1 epoch, small batch")
+    p.add_argument("--smoke", action="store_true", help="Quick run: 1 epoch, small data subset")
     p.add_argument("--max-train-sessions", type=int, default=0, help="Limit train sessions (0=all)")
+    p.add_argument("--max-valid-sessions", type=int, default=0, help="Limit valid sessions (0=all)")
+    p.add_argument("--max-test-sessions", type=int, default=0, help="Limit test sessions (0=all)")
+    p.add_argument(
+        "--log-every",
+        type=int,
+        default=50,
+        help="Print training progress every N batches (0=disable)",
+    )
     p.add_argument(
         "--log-dir",
         type=Path,
@@ -193,21 +201,54 @@ def build_augmented_batch(batch, lookup, taxonomy, item2leaf, leaf2parent, eta_a
     return next(iter(DataLoader(aug_ds, batch_size=len(aug_ds))))
 
 
+def _limit_sessions(sessions: list[list[int]], limit: int, label: str) -> list[list[int]]:
+    if limit <= 0 or limit >= len(sessions):
+        return sessions
+    print(f"  {label}: using {limit}/{len(sessions)} sessions", flush=True)
+    return sessions[:limit]
+
+
+def _build_dataset_timed(
+    sessions: list[list[int]],
+    item2leaf: dict[int, int],
+    leaf2parent: dict[int, int],
+    taxonomy,
+    label: str,
+):
+    t0 = time.time()
+    print(f"Building {label} graphs ({len(sessions)} sessions)...", flush=True)
+    dataset = build_dataset(sessions, item2leaf, leaf2parent, taxonomy)
+    print(
+        f"  {label}: {len(dataset)} graphs ready in {time.time() - t0:.1f}s",
+        flush=True,
+    )
+    return dataset
+
+
 def main() -> None:
     args = parse_args()
     if args.smoke:
         args.epochs = 1
         args.batch_size = min(args.batch_size, 32)
+        if args.max_train_sessions == 0:
+            args.max_train_sessions = 200
+        if args.max_valid_sessions == 0:
+            args.max_valid_sessions = 100
+        if args.max_test_sessions == 0:
+            args.max_test_sessions = 100
 
     device = resolve_device(args.device)
     pin_memory = device.type == "cuda"
     device_info = format_device_info(device)
-    print(f"Device: {device_info} (requested={args.device})")
+    print(f"Device: {device_info} (requested={args.device})", flush=True)
     ds_name = args.dataset.lower()
     ddir = data_dir(PROBLEM, ds_name)
 
+    print("Loading artifact...", flush=True)
+    t0 = time.time()
     artifact = load_artifact(ddir)
     lookup = load_lookup_tables(ddir)
+    print(f"  loaded in {time.time() - t0:.1f}s", flush=True)
 
     item2cat = {int(k): int(v) for k, v in artifact["item2cat"].items()}
     cat_parent = {int(k): int(v) for k, v in artifact["cat_parent"].items()}
@@ -216,16 +257,33 @@ def main() -> None:
     all_sessions = []
     for split in ("train", "valid", "test"):
         all_sessions.extend(artifact["splits"][split])
+    print("Fitting taxonomy encoders...", flush=True)
+    t0 = time.time()
     taxonomy = fit_taxonomy_encoders(all_sessions, item2leaf_1b, leaf2parent)
+    print(
+        f"  items={taxonomy.num_items} leaf={taxonomy.num_leaf_cats} "
+        f"parent={taxonomy.num_parent_cats} ({time.time() - t0:.1f}s)",
+        flush=True,
+    )
 
-    train_sessions = artifact["splits"]["train"]
-    if args.smoke and args.max_train_sessions == 0:
-        args.max_train_sessions = 500
-    if args.max_train_sessions > 0:
-        train_sessions = train_sessions[: args.max_train_sessions]
-    train_ds = build_dataset(train_sessions, item2leaf_1b, leaf2parent, taxonomy)
-    valid_ds = build_dataset(artifact["splits"]["valid"], item2leaf_1b, leaf2parent, taxonomy)
-    test_ds = build_dataset(artifact["splits"]["test"], item2leaf_1b, leaf2parent, taxonomy)
+    train_sessions = _limit_sessions(
+        artifact["splits"]["train"], args.max_train_sessions, "train"
+    )
+    valid_sessions = _limit_sessions(
+        artifact["splits"]["valid"], args.max_valid_sessions, "valid"
+    )
+    test_sessions = _limit_sessions(
+        artifact["splits"]["test"], args.max_test_sessions, "test"
+    )
+    train_ds = _build_dataset_timed(
+        train_sessions, item2leaf_1b, leaf2parent, taxonomy, "train"
+    )
+    valid_ds = _build_dataset_timed(
+        valid_sessions, item2leaf_1b, leaf2parent, taxonomy, "valid"
+    )
+    test_ds = _build_dataset_timed(
+        test_sessions, item2leaf_1b, leaf2parent, taxonomy, "test"
+    )
 
     train_loader = DataLoader(
         train_ds, batch_size=args.batch_size, shuffle=True, pin_memory=pin_memory
@@ -256,7 +314,13 @@ def main() -> None:
 
     log_path, log_mins_path = resolve_log_paths(args, ds_name)
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    print(f"Process log: {log_path}")
+    print(f"Process log: {log_path}", flush=True)
+    n_train_batches = max(len(train_loader), 1)
+    print(
+        f"Training: {args.epochs} epoch(s), batch_size={args.batch_size}, "
+        f"train_batches={n_train_batches}",
+        flush=True,
+    )
 
     with log_path.open("a", encoding="utf-8") as logf:
         logf.write(f"\n{'='*60}\nCatSA run {datetime.now()} mode={args.mode} args={args}\n")
@@ -289,7 +353,18 @@ def main() -> None:
                 optimizer.step()
                 total_loss += float(loss.item())
                 n_batches += 1
+                if args.log_every > 0 and (
+                    n_batches % args.log_every == 0 or n_batches == n_train_batches
+                ):
+                    progress = (
+                        f"  train batch {n_batches}/{n_train_batches} "
+                        f"loss={total_loss / n_batches:.4f}"
+                    )
+                    print(progress, flush=True)
+                    logf.write(progress + "\n")
+                    logf.flush()
 
+            print("Evaluating on valid...", flush=True)
             val_hr, val_mrr = evaluate(model, valid_loader, device, k)
             msg = (
                 f"epoch={epoch+1} loss={total_loss/max(n_batches,1):.4f} "

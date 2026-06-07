@@ -40,7 +40,40 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--smoke", action="store_true", help="1 epoch, subsampled data (quick check)")
     parser.add_argument("--max-train-samples", type=int, default=0)
     parser.add_argument("--max-test-samples", type=int, default=0)
+    parser.add_argument(
+        "--log-dir",
+        type=Path,
+        default=None,
+        help="Process log root → <log-dir>/<dataset>/DD-MM-YYYY.log",
+    )
+    parser.add_argument(
+        "--log-mins-dir",
+        type=Path,
+        default=None,
+        help="Summary log root → <log-mins-dir>/<dataset>/DD-MM-YYYY.log",
+    )
     return parser.parse_args()
+
+
+def resolve_log_paths(
+    args: argparse.Namespace,
+    ds_name: str,
+    *,
+    now: datetime | None = None,
+) -> tuple[Path, Path]:
+    now = now or datetime.now()
+    date_name = f"{now:%d-%m-%Y}.log"
+    if args.log_dir is not None:
+        process_log = Path(args.log_dir) / ds_name / date_name
+    else:
+        process_log = log_file("COTREC2", ds_name, now)
+    if args.log_mins_dir is not None:
+        summary_log = Path(args.log_mins_dir) / ds_name / date_name
+    else:
+        from ncs_paths import log_mins_file
+
+        summary_log = log_mins_file("COTREC2", ds_name, now)
+    return process_log, summary_log
 
 
 def _subsample_cotrec_data(
@@ -116,7 +149,7 @@ def main() -> None:
         best_results[f"epoch{k}"] = [0, 0]
         best_results[f"metric{k}"] = [0, 0]
 
-    log_path = log_file("COTREC2", ds, datetime.now())
+    log_path, log_mins_path = resolve_log_paths(args, ds)
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
     with log_path.open("a", encoding="utf-8") as logf:
@@ -161,11 +194,18 @@ def main() -> None:
         f"COTREC2 on CatSA data | split_mode={meta.get('split_mode')} | "
         f"n_node={n_node} | {args}"
     )
-    write_run_summary(
-        "COTREC2",
-        ds,
-        format_best_k_summary(ds, best_results, top_k, header=header),
-    )
+    summary_lines = format_best_k_summary(ds, best_results, top_k, header=header)
+    if args.log_mins_dir is not None:
+        log_mins_path.parent.mkdir(parents=True, exist_ok=True)
+        body = "\n".join(summary_lines)
+        if log_mins_path.exists() and log_mins_path.stat().st_size > 0:
+            body = f"\n{'=' * 60}\n{body}"
+        with log_mins_path.open("a", encoding="utf-8") as handle:
+            handle.write(body)
+            handle.write("\n")
+        print(f"Summary log: {log_mins_path}")
+    else:
+        write_run_summary("COTREC2", ds, summary_lines)
     print(f"Process log: {log_path}")
 
 

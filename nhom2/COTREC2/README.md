@@ -23,7 +23,25 @@ Output: `Data/COTREC2/retailrocket/`
 ## Bước 2 — Train COTREC
 
 ```bash
-python main.py --dataset retailrocket --epoch 30
+python -u main.py --dataset retailrocket --epoch 30 \
+  --log-dir /content/drive/MyDrive/NCS_NEW/LOG/COTREC2 \
+  --log-mins-dir /content/drive/MyDrive/NCS_NEW/LOGMins/COTREC2
+```
+
+Colab + nohup (full eval, không `--smoke`):
+
+```bash
+mkdir -p /content/drive/MyDrive/NCS_NEW/LOG/COTREC2/retailrocket
+mkdir -p /content/drive/MyDrive/NCS_NEW/LOGMins/COTREC2/retailrocket
+
+nohup python -u main.py \
+  --dataset retailrocket \
+  --epoch 30 \
+  --log-dir /content/drive/MyDrive/NCS_NEW/LOG/COTREC2 \
+  --log-mins-dir /content/drive/MyDrive/NCS_NEW/LOGMins/COTREC2 \
+  > /content/drive/MyDrive/NCS_NEW/LOG/COTREC2/retailrocket/nohup-$(date +%d-%m-%Y).log 2>&1 &
+
+echo $!
 ```
 
 Smoke test nhanh:

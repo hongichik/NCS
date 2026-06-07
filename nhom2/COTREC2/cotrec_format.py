@@ -8,7 +8,16 @@ from pathlib import Path
 from typing import Any
 
 
-def expand_session_samples(sessions: list[list[int]]) -> tuple[list[list[int]], list[int]]:
+def default_max_prefix_len(dataset: str) -> int:
+    """COTREC pos_embedding cap (model.py): retailrocket=300, others=200."""
+    return 300 if dataset.lower() == "retailrocket" else 200
+
+
+def expand_session_samples(
+    sessions: list[list[int]],
+    *,
+    max_prefix_len: int = 0,
+) -> tuple[list[list[int]], list[int]]:
     """Prefix → next-item pairs (same logic as CatSA / SR-GNN preprocess)."""
     prefixes: list[list[int]] = []
     targets: list[int] = []
@@ -16,9 +25,28 @@ def expand_session_samples(sessions: list[list[int]]) -> tuple[list[list[int]], 
         if len(seq) < 2:
             continue
         for end in range(1, len(seq)):
-            prefixes.append(list(seq[:end]))
+            start = 0
+            if max_prefix_len > 0:
+                start = max(0, end - max_prefix_len)
+            prefixes.append(list(seq[start:end]))
             targets.append(int(seq[end]))
     return prefixes, targets
+
+
+def truncate_cotrec_prefixes(
+    data: tuple[list[list[int]], list[int]],
+    max_prefix_len: int,
+) -> tuple[list[list[int]], list[int]]:
+    if max_prefix_len <= 0:
+        return data
+    prefixes, targets = data
+    trimmed = [p[-max_prefix_len:] if len(p) > max_prefix_len else p for p in prefixes]
+    return trimmed, targets
+
+
+def max_prefix_in_data(data: tuple[list[list[int]], list[int]]) -> int:
+    prefixes = data[0]
+    return max((len(p) for p in prefixes), default=0)
 
 
 def pick_session_pools(
@@ -53,9 +81,15 @@ def build_cotrec_pickle(
     train_sessions: list[list[int]],
     test_sessions: list[list[int]],
     graph_sessions: list[list[int]],
+    *,
+    max_prefix_len: int = 0,
 ) -> tuple[tuple[list, list], tuple[list, list], list[list[int]]]:
-    train_prefixes, train_targets = expand_session_samples(train_sessions)
-    test_prefixes, test_targets = expand_session_samples(test_sessions)
+    train_prefixes, train_targets = expand_session_samples(
+        train_sessions, max_prefix_len=max_prefix_len
+    )
+    test_prefixes, test_targets = expand_session_samples(
+        test_sessions, max_prefix_len=max_prefix_len
+    )
     train_data = (train_prefixes, train_targets)
     test_data = (test_prefixes, test_targets)
     return train_data, test_data, graph_sessions
@@ -66,7 +100,11 @@ def export_from_catsa_artifact(
     output_dir: Path,
     *,
     split_mode: str = "catsa",
+    max_prefix_len: int = 0,
+    dataset: str = "retailrocket",
 ) -> dict[str, Any]:
+    if max_prefix_len <= 0:
+        max_prefix_len = default_max_prefix_len(dataset)
     with artifact_path.open("r", encoding="utf-8") as handle:
         artifact = json.load(handle)
 
@@ -75,7 +113,10 @@ def export_from_catsa_artifact(
         splits, split_mode=split_mode
     )
     train_data, test_data, all_train = build_cotrec_pickle(
-        train_sessions, test_sessions, graph_sessions
+        train_sessions,
+        test_sessions,
+        graph_sessions,
+        max_prefix_len=max_prefix_len,
     )
 
     num_items = int(artifact.get("num_items", 0))
@@ -101,6 +142,9 @@ def export_from_catsa_artifact(
         "n_graph_sessions": len(graph_sessions),
         "n_train_samples": len(train_data[0]),
         "n_test_samples": len(test_data[0]),
+        "max_prefix_len": max_prefix_len,
+        "max_train_prefix": max_prefix_in_data(train_data),
+        "max_test_prefix": max_prefix_in_data(test_data),
     }
     with (output_dir / "meta.json").open("w", encoding="utf-8") as handle:
         json.dump(meta, handle, indent=2)

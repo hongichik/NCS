@@ -20,6 +20,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from model import COTREC, train_test, trans_to_cuda  # noqa: E402
 from util import Data  # noqa: E402
 
+from cotrec_format import (  # noqa: E402
+    default_max_prefix_len,
+    max_prefix_in_data,
+    truncate_cotrec_prefixes,
+)
+
 from ncs_logging import format_best_k_summary, write_run_summary  # noqa: E402
 from ncs_paths import data_dir, log_file  # noqa: E402
 
@@ -37,6 +43,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lam", type=float, default=0.005)
     parser.add_argument("--eps", type=float, default=0.2)
     parser.add_argument("--data-dir", type=Path, default=None)
+    parser.add_argument(
+        "--max-prefix-len",
+        type=int,
+        default=0,
+        help="Truncate prefixes to COTREC pos_len (default: 300 retailrocket)",
+    )
     parser.add_argument("--smoke", action="store_true", help="1 epoch, subsampled data (quick check)")
     parser.add_argument("--max-train-samples", type=int, default=0)
     parser.add_argument("--max-test-samples", type=int, default=0)
@@ -116,6 +128,19 @@ def main() -> None:
     train_data = pickle.load(open(data_root / "train.txt", "rb"))
     test_data = pickle.load(open(data_root / "test.txt", "rb"))
     all_train = pickle.load(open(data_root / "all_train_seq.txt", "rb"))
+
+    max_prefix_len = args.max_prefix_len or int(
+        meta.get("max_prefix_len") or default_max_prefix_len(ds)
+    )
+    train_max = max_prefix_in_data(train_data)
+    test_max = max_prefix_in_data(test_data)
+    if train_max > max_prefix_len or test_max > max_prefix_len:
+        print(
+            f"Truncating prefixes to {max_prefix_len} "
+            f"(was train_max={train_max} test_max={test_max}; COTREC pos_len limit)"
+        )
+        train_data = truncate_cotrec_prefixes(train_data, max_prefix_len)
+        test_data = truncate_cotrec_prefixes(test_data, max_prefix_len)
     train_data = _subsample_cotrec_data(train_data, args.max_train_samples)
     test_data = _subsample_cotrec_data(test_data, args.max_test_samples)
     if args.max_train_samples or args.max_test_samples:

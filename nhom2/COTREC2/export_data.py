@@ -37,6 +37,12 @@ def parse_args() -> argparse.Namespace:
         default="catsa",
         help="catsa=train split only; full=train+valid for COTREC training",
     )
+    parser.add_argument(
+        "--max-prefix-len",
+        type=int,
+        default=0,
+        help="Cap prefix length to COTREC pos_embedding (default: 300 retailrocket, 200 else)",
+    )
     return parser.parse_args()
 
 
@@ -53,6 +59,8 @@ def main() -> None:
         artifact,
         out_dir,
         split_mode=args.split_mode,
+        max_prefix_len=args.max_prefix_len,
+        dataset=ds,
     )
     print(f"Exported to {out_dir}")
     for key, value in meta.items():

@@ -50,19 +50,79 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--eta-aug", type=float, default=0.3)
     p.add_argument("--k-min", type=int, default=5)
     p.add_argument("--patience", type=int, default=5)
-    p.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    p.add_argument(
+        "--device",
+        default="auto",
+        choices=["auto", "cpu", "cuda", "mps"],
+        help="auto: cuda > mps > cpu",
+    )
     p.add_argument("--metric-k", type=int, default=20)
     p.add_argument("--smoke", action="store_true", help="Quick run: 1 epoch, small batch")
     p.add_argument("--max-train-sessions", type=int, default=0, help="Limit train sessions (0=all)")
+    p.add_argument(
+        "--log-dir",
+        type=Path,
+        default=None,
+        help="Custom process log root (e.g. /content/drive/MyDrive/NCS/LOG/CatSA). "
+        "File: <log-dir>/<dataset>/DD-MM-YYYY.log",
+    )
+    p.add_argument(
+        "--log-mins-dir",
+        type=Path,
+        default=None,
+        help="Custom summary log root (e.g. /content/drive/MyDrive/NCS/LOGMins/CatSA). "
+        "File: <log-mins-dir>/<dataset>/DD-MM-YYYY.log",
+    )
     return p.parse_args()
 
 
+def resolve_log_paths(
+    args: argparse.Namespace,
+    ds_name: str,
+    *,
+    now: datetime | None = None,
+) -> tuple[Path, Path]:
+    now = now or datetime.now()
+    date_name = f"{now:%d-%m-%Y}.log"
+    if args.log_dir is not None:
+        process_log = Path(args.log_dir) / ds_name / date_name
+    else:
+        process_log = log_file(PROBLEM, ds_name, now)
+    if args.log_mins_dir is not None:
+        summary_log = Path(args.log_mins_dir) / ds_name / date_name
+    else:
+        from ncs_paths import log_mins_file
+
+        summary_log = log_mins_file(PROBLEM, ds_name, now)
+    return process_log, summary_log
+
+
 def resolve_device(name: str) -> torch.device:
-    if name == "cuda":
-        return torch.device("cuda")
     if name == "cpu":
         return torch.device("cpu")
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if name == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError(
+                "CUDA không khả dụng. Trên Colab: Runtime → Change runtime type → GPU. "
+                "Hoặc dùng --device cpu."
+            )
+        return torch.device("cuda")
+    if name == "mps":
+        if not hasattr(torch.backends, "mps") or not torch.backends.mps.is_available():
+            raise RuntimeError("MPS không khả dụng trên máy này. Dùng --device cpu hoặc cuda.")
+        return torch.device("mps")
+    # auto
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
+def format_device_info(device: torch.device) -> str:
+    if device.type == "cuda":
+        return f"cuda ({torch.cuda.get_device_name(device)})"
+    return str(device)
 
 
 def build_dataset(
@@ -140,6 +200,9 @@ def main() -> None:
         args.batch_size = min(args.batch_size, 32)
 
     device = resolve_device(args.device)
+    pin_memory = device.type == "cuda"
+    device_info = format_device_info(device)
+    print(f"Device: {device_info} (requested={args.device})")
     ds_name = args.dataset.lower()
     ddir = data_dir(PROBLEM, ds_name)
 
@@ -164,9 +227,15 @@ def main() -> None:
     valid_ds = build_dataset(artifact["splits"]["valid"], item2leaf_1b, leaf2parent, taxonomy)
     test_ds = build_dataset(artifact["splits"]["test"], item2leaf_1b, leaf2parent, taxonomy)
 
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
-    valid_loader = DataLoader(valid_ds, batch_size=args.batch_size, shuffle=False)
-    test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False)
+    train_loader = DataLoader(
+        train_ds, batch_size=args.batch_size, shuffle=True, pin_memory=pin_memory
+    )
+    valid_loader = DataLoader(
+        valid_ds, batch_size=args.batch_size, shuffle=False, pin_memory=pin_memory
+    )
+    test_loader = DataLoader(
+        test_ds, batch_size=args.batch_size, shuffle=False, pin_memory=pin_memory
+    )
 
     model = CatSA(
         num_items=taxonomy.num_items,
@@ -185,11 +254,14 @@ def main() -> None:
     best_hr, best_mrr, best_epoch = 0.0, 0.0, 0
     patience_ctr = 0
 
-    log_path = log_file(PROBLEM, ds_name)
+    log_path, log_mins_path = resolve_log_paths(args, ds_name)
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    print(f"Process log: {log_path}")
 
     with log_path.open("a", encoding="utf-8") as logf:
         logf.write(f"\n{'='*60}\nCatSA run {datetime.now()} mode={args.mode} args={args}\n")
+        logf.write(f"Device: {device_info} (requested={args.device})\n")
+        logf.write(f"Process log path: {log_path}\n")
 
         for epoch in range(args.epochs):
             model.train()
@@ -198,7 +270,11 @@ def main() -> None:
             n_batches = 0
 
             for batch in train_loader:
-                batch = batch.to(device)
+                batch = batch.to(device, non_blocking=pin_memory)
+                if n_batches == 0:
+                    sample_param = next(model.parameters())
+                    print(f"Model param device: {sample_param.device}")
+                    logf.write(f"Model param device: {sample_param.device}\n")
                 graph_aug = None
                 if args.mode == "full":
                     graph_aug = build_augmented_batch(
@@ -248,11 +324,18 @@ def main() -> None:
         "metric5": [0, 0],
         "epoch5": [0, 0],
     }
-    write_run_summary(
-        PROBLEM,
-        ds_name,
-        format_best_k_summary(ds_name, best_results, [20], header=str(args)),
-    )
+    summary_lines = format_best_k_summary(ds_name, best_results, [20], header=str(args))
+    if args.log_mins_dir is not None:
+        log_mins_path.parent.mkdir(parents=True, exist_ok=True)
+        body = "\n".join(summary_lines)
+        if log_mins_path.exists() and log_mins_path.stat().st_size > 0:
+            body = f"\n{'=' * 60}\n{body}"
+        with log_mins_path.open("a", encoding="utf-8") as handle:
+            handle.write(body)
+            handle.write("\n")
+        print(f"Summary log: {log_mins_path}")
+    else:
+        write_run_summary(PROBLEM, ds_name, summary_lines)
 
 
 if __name__ == "__main__":

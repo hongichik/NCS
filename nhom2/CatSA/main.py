@@ -183,18 +183,18 @@ def build_augmented_batch(batch, lookup, taxonomy, item2leaf, leaf2parent, eta_a
     cat2items = lookup["cat2items"]
     siblings = lookup["siblings"]
     graphs = batch.to_data_list()
-    aug_sessions, targets = [], []
+    aug_sessions = []
     for g in graphs:
         session = [int(x) for x in g.raw_session.tolist()]
         session_0 = [x - 1 for x in session]
         aug_0 = catsa_augment(session_0, item2cat, cat2items, siblings, eta_aug=eta_aug, k_min=k_min)
         aug_sessions.append([x + 1 for x in aug_0])
-        targets.append(int(g.y.view(-1)[0].item()))
+    # Augmented graphs only feed session-level CL; targets are not used in encode_session.
     aug_ds = CategorySessionGraphDataset(
         session_sequences=aug_sessions,
         item2leaf_dict=item2leaf,
         leaf2parent_dict=leaf2parent,
-        targets=targets,
+        targets=None,
         taxonomy=taxonomy,
         raw_sessions=aug_sessions,
     )

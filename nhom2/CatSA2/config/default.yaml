@@ -1,0 +1,20 @@
+# CatSA2 defaults — aligned with "Xây dựng CatSA" guide (May 2026)
+dataset: retailrocket
+mode: full          # a2 = Module 1 only; full = + Module 2 + session-CL
+epochs: 30
+batch_size: 100
+hidden_dim: 100
+num_layers: 2
+lr: 0.001
+weight_decay: 0.00001
+dropout: 0.1
+cl_weight: 0.1
+temperature: 0.5
+eta_aug: 0.3
+eta_crop: 0.75
+k_min: 5
+patience: 5
+seed: 42
+metric_ks: [10, 20]
+device: auto
+log_every: 50

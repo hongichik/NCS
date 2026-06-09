@@ -1,0 +1,76 @@
+
+============================================================
+CatSA2 run 2026-06-09 20:12:12.874097 mode=full
+config=/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml seed=42 args=Namespace(batch_size=32, cl_weight=0.1, config=PosixPath('/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml'), dataset='retailrocket', device='cpu', dropout=0.1, epochs=1, eta_aug=0.3, hidden_dim=100, k_min=5, log_dir=None, log_every=50, log_mins_dir=None, lr=0.001, max_test_sessions=100, max_train_sessions=200, max_valid_sessions=100, metric_k=20, metric_ks=[10, 20], mode='full', num_layers=2, patience=5, seed=42, smoke=True, temperature=0.5, weight_decay=1e-05)
+Device: cpu
+  batch 17/17 loss=24.8318
+
+============================================================
+CatSA2 run 2026-06-09 20:12:27.176841 mode=full
+config=/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml seed=42 args=Namespace(batch_size=32, cl_weight=0.1, config=PosixPath('/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml'), dataset='retailrocket', device='cpu', dropout=0.1, epochs=1, eta_aug=0.3, hidden_dim=100, k_min=5, log_dir=None, log_every=50, log_mins_dir=None, lr=0.001, max_test_sessions=100, max_train_sessions=200, max_valid_sessions=100, metric_k=20, metric_ks=[10, 20], mode='full', num_layers=2, patience=5, seed=42, smoke=True, temperature=0.5, weight_decay=1e-05)
+Device: cpu
+  batch 17/17 loss=24.8318
+epoch=1 loss=24.8318 rec=24.5603 cl=2.7141 val_HR@20=33.1839 val_NDCG@20=29.0917 val_MRR@20=27.8975 time=8.0s
+TEST HR@10=17.0370 NDCG@10=14.7043 MRR@10=13.9556
+TEST HR@20=18.1481 NDCG@20=14.9874 MRR@20=14.0346
+BEST_VAL HR@20=33.1839 epoch=1
+
+============================================================
+CatSA2 run 2026-06-09 20:12:50.795148 mode=a2
+config=/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml seed=42 args=Namespace(batch_size=32, cl_weight=0.1, config=PosixPath('/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml'), dataset='retailrocket', device='cpu', dropout=0.1, epochs=1, eta_aug=0.3, hidden_dim=100, k_min=5, log_dir=None, log_every=50, log_mins_dir=None, lr=0.001, max_test_sessions=100, max_train_sessions=200, max_valid_sessions=100, metric_k=20, metric_ks=[10, 20], mode='a2', num_layers=2, patience=5, seed=42, smoke=True, temperature=0.5, weight_decay=1e-05)
+Device: cpu
+  batch 17/17 loss=25.0864
+epoch=1 loss=25.0864 rec=25.0864 cl=0.0000 val_HR@20=32.0628 val_NDCG@20=29.6464 val_MRR@20=28.9340 time=5.9s
+TEST HR@10=18.5185 NDCG@10=16.1342 MRR@10=15.3992
+TEST HR@20=19.2593 NDCG@20=16.3186 MRR@20=15.4482
+BEST_VAL HR@20=32.0628 epoch=1
+2026-06-09 20:14:22,392 | INFO | source_root=/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/Data/datagoc/Retailrocket (resolved=/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/Data/datagoc/Retailrocket)
+2026-06-09 20:14:42,047 | INFO | sessions_after_filter=332447
+2026-06-09 20:14:45,343 | INFO | train_sessions=316920 test_sessions=15437 num_items=60520
+2026-06-09 20:16:11,431 | INFO | saved /Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/Data/CatSA2/retailrocket/retailrocket.json
+2026-06-09 20:16:11,432 | INFO | saved /Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/Data/CatSA2/retailrocket/lookup_tables.pkl
+2026-06-09 20:16:11,432 | INFO | |C|=942 items_with_cat=55617
+2026-06-09 20:16:11,432 | INFO | split train: 221844 sessions
+2026-06-09 20:16:11,432 | INFO | split valid: 63384 sessions
+2026-06-09 20:16:11,432 | INFO | split test: 15437 sessions
+
+============================================================
+CatSA2 run 2026-06-09 20:18:52.732900 mode=a2
+config=/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml seed=42 args=Namespace(batch_size=32, cl_weight=0.1, config=PosixPath('/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml'), dataset='retailrocket', device='mps', dropout=0.1, epochs=1, eta_aug=0.3, hidden_dim=100, k_min=5, log_dir=None, log_every=50, log_mins_dir=None, lr=0.001, max_test_sessions=100, max_train_sessions=200, max_valid_sessions=100, metric_k=20, metric_ks=[10, 20], mode='a2', num_layers=2, patience=5, seed=42, smoke=True, temperature=0.5, weight_decay=1e-05)
+Device: mps
+
+============================================================
+CatSA2 run 2026-06-09 20:19:08.818905 mode=a2
+config=/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml seed=42 args=Namespace(batch_size=32, cl_weight=0.1, config=PosixPath('/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml'), dataset='retailrocket', device='cpu', dropout=0.1, epochs=1, eta_aug=0.3, hidden_dim=100, k_min=5, log_dir=None, log_every=50, log_mins_dir=None, lr=0.001, max_test_sessions=100, max_train_sessions=200, max_valid_sessions=100, metric_k=20, metric_ks=[10, 20], mode='a2', num_layers=2, patience=5, seed=42, smoke=True, temperature=0.5, weight_decay=1e-05)
+Device: cpu
+  batch 17/17 loss=24.9166
+epoch=1 loss=24.9166 rec=24.9166 cl=0.0000 val_HR@20=30.2691 val_NDCG@20=28.0484 val_MRR@20=27.4167 time=5.5s
+TEST HR@10=15.5556 NDCG@10=14.1071 MRR@10=13.6614
+TEST HR@20=17.4074 NDCG@20=14.5589 MRR@20=13.7766
+BEST_VAL HR@20=30.2691 epoch=1
+
+============================================================
+CatSA2 run 2026-06-09 20:20:43.808838 mode=a2
+config=/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml seed=42 args=Namespace(batch_size=100, cl_weight=0.1, config=PosixPath('/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml'), dataset='retailrocket', device='mps', dropout=0.1, epochs=10, eta_aug=0.3, hidden_dim=100, k_min=5, log_dir=None, log_every=50, log_mins_dir=None, lr=0.001, max_test_sessions=1500, max_train_sessions=5000, max_valid_sessions=1500, metric_k=20, metric_ks=[10, 20], mode='a2', num_layers=2, patience=5, seed=42, smoke=False, temperature=0.5, weight_decay=1e-05)
+Device: mps
+
+============================================================
+CatSA2 run 2026-06-09 20:20:10.993211 mode=a2
+config=/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml seed=42 args=Namespace(batch_size=100, cl_weight=0.1, config=PosixPath('/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml'), dataset='retailrocket', device='cpu', dropout=0.1, epochs=1, eta_aug=0.3, hidden_dim=100, k_min=5, log_dir=None, log_every=50, log_mins_dir=None, lr=0.001, max_test_sessions=1500, max_train_sessions=5000, max_valid_sessions=1500, metric_k=20, metric_ks=[10, 20], mode='a2', num_layers=2, patience=5, seed=42, smoke=False, temperature=0.5, weight_decay=1e-05)
+Device: cpu
+  batch 50/128 loss=24.6989
+  batch 100/128 loss=23.6129
+  batch 128/128 loss=23.1779
+epoch=1 loss=23.1779 rec=23.1779 cl=0.0000 val_HR@20=17.4037 val_NDCG@20=13.7804 val_MRR@20=12.6885 time=152.8s
+TEST HR@10=22.1419 NDCG@10=18.7315 MRR@10=17.6498
+TEST HR@20=23.5201 NDCG@20=19.0837 MRR@20=17.7482
+BEST_VAL HR@20=17.4037 epoch=1
+
+============================================================
+CatSA2 run 2026-06-09 20:23:58.229085 mode=a2
+config=/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml seed=42 args=Namespace(batch_size=100, cl_weight=0.1, config=PosixPath('/Users/admin/Documents/tài liệu tham khảo NCS/NCS_serve/nhom2/CatSA2/config/default.yaml'), dataset='retailrocket', device='cpu', dropout=0.1, epochs=10, eta_aug=0.3, hidden_dim=100, k_min=5, log_dir=None, log_every=50, log_mins_dir=None, lr=0.001, max_test_sessions=1500, max_train_sessions=5000, max_valid_sessions=1500, metric_k=20, metric_ks=[10, 20], mode='a2', num_layers=2, patience=5, seed=42, smoke=False, temperature=0.5, weight_decay=1e-05)
+Device: cpu
+  batch 50/128 loss=24.6989
+  batch 100/128 loss=23.6129
+  batch 128/128 loss=23.1779
+epoch=1 loss=23.1779 rec=23.1779 cl=0.0000 val_HR@20=17.4037 val_NDCG@20=13.7804 val_MRR@20=12.6885 time=113.9s

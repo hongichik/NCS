@@ -1,0 +1,18 @@
+CatSA2 full
+best Recall@10=17.0370 epoch=0 | best MRR@10=13.9556 epoch=0
+best Recall@20=18.1481 epoch=0 | best MRR@20=14.0346 epoch=0
+
+============================================================
+CatSA2 a2
+best Recall@10=18.5185 epoch=0 | best MRR@10=15.3992 epoch=0
+best Recall@20=19.2593 epoch=0 | best MRR@20=15.4482 epoch=0
+
+============================================================
+CatSA2 a2
+best Recall@10=15.5556 epoch=0 | best MRR@10=13.6614 epoch=0
+best Recall@20=17.4074 epoch=0 | best MRR@20=13.7766 epoch=0
+
+============================================================
+CatSA2 a2
+best Recall@10=22.1419 epoch=0 | best MRR@10=17.6498 epoch=0
+best Recall@20=23.5201 epoch=0 | best MRR@20=17.7482 epoch=0

@@ -15,6 +15,7 @@ PROJECT_DIRS: dict[str, str] = {
     "COTREC": "nhom2/COTREC",
     "COTREC2": "nhom2/COTREC2",
     "CatSA": "nhom2/CatSA",
+    "CatSA2": "nhom2/CatSA2",
     "CSGNN": "nhom2/CSGNN",
     "DuoRec": "nhom3/DuoRec",
     "SelfContrastiveLearningRecSys": "nhom3/SelfContrastiveLearningRecSys",
